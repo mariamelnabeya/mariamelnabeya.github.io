@@ -101,6 +101,22 @@ html,body{overflow-x:clip}
 .drawer.open{visibility:visible}
 @media(max-width:900px) and (min-width:721px){.tools{grid-template-columns:1fr 1fr 1fr}.tools input{grid-column:1/-1}}
 
+/* ---- My Cart ---- */
+.cart-ico{width:1.25em;height:1.25em;vertical-align:-.25em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cart-ico circle{fill:currentColor;stroke:none}
+.cart-btn{display:inline-flex;align-items:center;gap:6px}
+.drawer-head h2{display:flex;align-items:center;gap:8px}
+.cart-fab{position:fixed;right:18px;bottom:18px;z-index:15;width:64px;height:64px;border-radius:50%;border:0;background:var(--duck);color:var(--ink);box-shadow:0 4px 0 var(--duck-dark),0 8px 22px rgba(59,47,74,.28);display:grid;place-items:center;cursor:pointer}
+.cart-fab[hidden]{display:none}
+.cart-fab .cart-ico{width:30px;height:30px;vertical-align:0}
+.cart-fab:hover{background:#FFC81A}
+.fab-count{position:absolute;top:-4px;right:-4px;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:var(--ink);color:#fff;font:700 .9rem Nunito;display:grid;place-items:center;border:2px solid #fff}
+.cart-fab.bump{animation:bump .45s ease}
+@keyframes bump{30%{transform:scale(1.18)}60%{transform:scale(.94)}100%{transform:scale(1)}}
+body.has-fab .toast{bottom:96px}
+body.has-fab .xmas{padding-bottom:100px}
+@media(prefers-reduced-motion:reduce){.cart-fab.bump{animation:none}}
+
 /* ---- Tap a photo to see it bigger ---- */
 .thumb{cursor:zoom-in;position:relative}
 .thumb::after{content:"🔍";position:absolute;right:10px;bottom:10px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-size:.95rem;box-shadow:0 1px 4px rgba(59,47,74,.18)}

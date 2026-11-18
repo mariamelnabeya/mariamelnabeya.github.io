@@ -78,7 +78,7 @@ function renderGrid() {
     const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = g.category;
     const av = document.createElement("span"); av.className = "tag" + (g.stock > 0 ? "" : " out"); av.textContent = g.stock > 0 ? (g.stock <= 3 ? `Only ${g.stock} left` : `${g.stock} left`) : "Out of stock";
     const pr = document.createElement("div"); pr.className = "price"; pr.textContent = `${g.points} Ducks`;
-    const btn = document.createElement("button"); btn.className = "primary"; btn.textContent = "Add to My Selection";
+    const btn = document.createElement("button"); btn.className = "primary"; btn.textContent = g.stock > 0 ? "Add to Cart" : "Out of stock";
     btn.disabled = !(g.stock > 0);
     btn.onclick = () => addOne(g);
     body.append(tag, h, p, av, pr, btn);
@@ -88,7 +88,8 @@ function renderGrid() {
 
 function addOne(g) {
   if ((cart[g.id] || 0) >= g.stock) { toast(`That is all we have of ${g.name}`); return; }
-  cart[g.id] = (cart[g.id] || 0) + 1; saveCart(); renderCart(); toast(`${g.name} added`);
+  cart[g.id] = (cart[g.id] || 0) + 1; saveCart(); renderCart(); toast(`${g.name} added to your cart`);
+  const fab = $("cartFab"); fab.classList.remove("bump"); void fab.offsetWidth; fab.classList.add("bump");
 }
 
 // Big photo view (tap a gift photo)
@@ -115,7 +116,7 @@ function cartLines() {
 function renderCart() {
   const lines = cartLines(), box = $("items"); box.innerHTML = "";
   let n = 0, pts = 0;
-  if (!lines.length) box.innerHTML = '<p class="empty">Nothing selected yet. Add a gift from the catalog.</p>';
+  if (!lines.length) box.innerHTML = '<p class="empty">Your cart is empty. Tap “Add to Cart” on a gift.</p>';
   lines.forEach(({ g, qty }) => {
     n += qty; pts += qty * g.points;
     const row = document.createElement("div"); row.className = "item";
@@ -134,13 +135,17 @@ function renderCart() {
   });
   $("totalGifts").textContent = n; $("totalPoints").textContent = pts;
   $("cartCount").textContent = n; $("submitBtn").disabled = !n;
+  $("fabCount").textContent = n;
+  $("cartFab").hidden = !n;
+  $("cartFab").setAttribute("aria-label", `Open my cart, ${n} item${n === 1 ? "" : "s"}`);
+  document.body.classList.toggle("has-fab", n > 0);
 }
 
 function openCart(open) {
   $("drawer").classList.toggle("open", open); $("overlay").classList.toggle("show", open);
   $("drawer").setAttribute("aria-hidden", String(!open));
 }
-$("openCart").onclick = () => openCart(true);
+$("openCart").onclick = $("cartFab").onclick = () => openCart(true);
 $("closeCart").onclick = $("overlay").onclick = () => openCart(false);
 $("clearBtn").onclick = () => { cart = {}; saveCart(); renderCart(); };
 $("submitBtn").onclick = () => { $("nameError").textContent = ""; $("nameDialog").showModal(); $("nameInput").focus(); };

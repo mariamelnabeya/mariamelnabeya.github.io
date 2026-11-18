@@ -27,7 +27,7 @@
 <header class="top">
   <h1><img src="assets/duck.svg" alt="" class="logo"> Mariam El Nabeya Duck Shop</h1>
   <p>Trade your Ducks for real gifts.</p>
-  <button id="openCart" class="cart-btn">My Selection <span id="cartCount">0</span></button>
+  <button id="openCart" class="cart-btn" aria-label="Open my cart"><svg class="cart-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg> My Cart <span id="cartCount">0</span></button>
   <div class="pond" aria-hidden="true">
     <img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt="">
     <svg viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 18 Q50 4 100 18 T200 18 T300 18 T400 18 T500 18 T600 18 T700 18 T800 18 T900 18 T1000 18 T1100 18 T1200 18 V40 H0Z" fill="#CBEAF7"/><path d="M0 28 Q60 14 120 28 T240 28 T360 28 T480 28 T600 28 T720 28 T840 28 T960 28 T1080 28 T1200 28 V40 H0Z" fill="#A9DBF0"/></svg>
@@ -63,13 +63,13 @@
 </section>
 
 <aside id="drawer" class="drawer" aria-hidden="true">
-  <div class="drawer-head"><h2>My Selection</h2><button id="closeCart" aria-label="Close">✕</button></div>
+  <div class="drawer-head"><h2><svg class="cart-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg> My Cart</h2><button id="closeCart" aria-label="Close">✕</button></div>
   <div id="items" class="items"></div>
   <div class="drawer-foot">
     <p>Total gifts: <b id="totalGifts">0</b></p>
     <p>Total Ducks: <b id="totalPoints">0</b></p>
     <button id="submitBtn" class="primary">Submit My Request</button>
-    <button id="clearBtn" class="ghost">Clear selection</button>
+    <button id="clearBtn" class="ghost">Empty my cart</button>
     <p class="note">Your request is sent through WhatsApp. It is not saved on this website.</p>
   </div>
 </aside>
@@ -89,9 +89,13 @@
   <div class="photo-cap">
     <div><b id="photoName"></b><span id="photoStock" class="tag"></span></div>
     <p id="photoDesc"></p>
-    <div class="photo-row"><span id="photoPrice" class="price"></span><button type="button" id="photoAdd" class="primary">Add to My Selection</button></div>
+    <div class="photo-row"><span id="photoPrice" class="price"></span><button type="button" id="photoAdd" class="primary">Add to Cart</button></div>
   </div>
 </dialog>
+<button id="cartFab" class="cart-fab" aria-label="Open my cart" hidden>
+  <svg class="cart-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
+  <span id="fabCount" class="fab-count">0</span>
+</button>
 <div id="toast" class="toast" role="status"></div>
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
