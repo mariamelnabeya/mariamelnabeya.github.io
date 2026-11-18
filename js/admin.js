@@ -239,9 +239,40 @@ function previewUrl(url) {
   const img = new Image(); img.alt = "Current photo"; img.src = url; box.appendChild(img);
 }
 
+let chosenFile = null;   // last photo taken with the camera or picked from the gallery
+let rotation = 0;        // 0, 90, 180 or 270 degrees (clockwise)
+
+async function rotateBlob(blob, deg) {
+  const bmp = await bitmapOf(blob);
+  const side = deg % 180 !== 0;
+  const c = document.createElement("canvas");
+  c.width = side ? bmp.height : bmp.width; c.height = side ? bmp.width : bmp.height;
+  const x = c.getContext("2d");
+  x.translate(c.width / 2, c.height / 2); x.rotate(deg * Math.PI / 180);
+  x.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+  return canvasToJpeg(c, 0.95);
+}
+
+async function rotate(step) {
+  if (!chosenFile) {
+    // Rotating the photo a gift already has: start from that photo.
+    if (!editing || !editing.image) return;
+    try {
+      $("photoStatus").textContent = "Opening the current photo…";
+      const res = await fetch(imgSrc(editing), { cache: "no-store" });
+      if (!res.ok) throw new Error("Could not open the current photo.");
+      chosenFile = await res.blob();
+    } catch (err) { $("photoStatus").textContent = friendly(err); return; }
+  }
+  rotation = (rotation + step + 360) % 360;
+  preparePhoto();
+}
+$("rotLeft").onclick = () => rotate(-90);
+$("rotRight").onclick = () => rotate(90);
+
 async function preparePhoto() {
-  const file = $("photoInput").files[0];
-  if (!file) return;
+  if (!chosenFile) return;
+  const file = rotation ? await rotateBlob(chosenFile, rotation) : chosenFile;
   const job = ++photoJob;
   const enhance = $("enhanceToggle").checked;
   photo = { original: file, result: null };
@@ -267,10 +298,13 @@ async function preparePhoto() {
     if (job === photoJob) $("saveBtn").disabled = false;
   }
 }
-$("photoInput").addEventListener("change", preparePhoto);
+["photoInput", "cameraInput"].forEach(id => $(id).addEventListener("change", e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (f) { chosenFile = f; rotation = 0; $("rotateRow").hidden = false; preparePhoto(); }
+}));
 $("enhanceToggle").addEventListener("change", () => {
   try { localStorage.setItem(ENHANCE_KEY, $("enhanceToggle").checked ? "1" : "0"); } catch {}
-  if ($("photoInput").files[0]) preparePhoto();
+  if (chosenFile) preparePhoto();
 });
 function setSeg(v) {
   document.querySelectorAll("#viewSeg button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
@@ -283,7 +317,8 @@ document.querySelectorAll("#viewSeg button").forEach(b => b.onclick = () => {
 
 // ---------- add / edit ----------
 function openEditor(g = null) {
-  editing = g; photo = null; photoJob++;
+  editing = g; photo = null; chosenFile = null; rotation = 0; photoJob++;
+  $("rotateRow").hidden = !(g && g.image);
   $("editForm").reset();
   try { $("enhanceToggle").checked = localStorage.getItem(ENHANCE_KEY) !== "0"; } catch {}
   $("editorTitle").textContent = g ? `Edit ${g.name}` : "Add a gift";
@@ -429,10 +464,10 @@ $("revUse").onclick = async () => {
   } finally { b.textContent = "Use new photo"; }
 };
 $("revKeep").onclick = () => { rev.kept++; rev.i++; revItem(); };
-$("revFile").addEventListener("change", () => {
-  const f = $("revFile").files[0]; $("revFile").value = "";
+["revFile", "revCamera"].forEach(id => $(id).addEventListener("change", e => {
+  const f = e.target.files[0]; e.target.value = "";
   if (f) revItem(f);
-});
+}));
 
 function revFinish(msg) {
   revShow("revDone");

@@ -72,11 +72,20 @@
     <div class="photo-area">
       <div class="photo-preview" id="photoPreview"><span class="muted">No photo yet</span></div>
       <div class="photo-controls">
-        <label class="primary file-btn">Choose a photo
-          <input id="photoInput" type="file" accept="image/*" hidden>
-        </label>
+        <div class="photo-btns">
+          <label class="primary file-btn">📷 Take a photo
+            <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+          </label>
+          <label class="ghost file-btn">🖼️ Choose from gallery
+            <input id="photoInput" type="file" accept="image/*" hidden>
+          </label>
+        </div>
         <label class="check"><input id="enhanceToggle" type="checkbox" checked>
           <span>Make the photo pretty automatically <small>Removes the background and adds a soft studio backdrop.</small></span></label>
+        <div class="rotate" id="rotateRow" hidden>
+          <button type="button" id="rotLeft" class="ghost" aria-label="Rotate left">↺ Rotate left</button>
+          <button type="button" id="rotRight" class="ghost" aria-label="Rotate right">↻ Rotate right</button>
+        </div>
         <div class="seg" id="viewSeg" hidden>
           <button type="button" data-view="result" class="on">Edited</button>
           <button type="button" data-view="original">Original</button>
@@ -129,6 +138,7 @@
     <div class="rev-actions">
       <button type="button" id="revUse" class="primary" disabled>Use new photo</button>
       <button type="button" id="revKeep" class="ghost">Keep old</button>
+      <label class="ghost file-btn">📷 Take a new photo<input id="revCamera" type="file" accept="image/*" capture="environment" hidden></label>
       <label class="ghost file-btn">Use a different photo<input id="revFile" type="file" accept="image/*" hidden></label>
       <button type="button" id="revStop" class="ghost">Stop</button>
     </div>
