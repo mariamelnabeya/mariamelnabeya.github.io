@@ -2,7 +2,8 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm";
 
 const BG_REMOVAL = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm";
-const OUT_W = 800, OUT_H = 600;          // size of edited photos (4:3, like the shop cards)
+const OUT_W = 1200, OUT_H = 900;         // size of saved photos (4:3, like the shop cards; sharp on phones)
+const MAX_ENLARGE = 1.5;                 // never stretch a photo more than this (more = blurry)
 const ENHANCE_KEY = "duckshop-admin-enhance";
 
 const $ = id => document.getElementById(id);
@@ -160,25 +161,51 @@ function canvasToJpeg(canvas, q = 0.86) {
   return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error("Could not save the photo")), "image/jpeg", q));
 }
 
-// Without editing: just make it a sensible size (max 1200px) as JPEG.
+// Resize an image (or part of it) smoothly: big reductions are done in halves,
+// so fine details stay sharp instead of turning jagged or blurry.
+function scaledCanvas(src, sx, sy, sw, sh, dw, dh) {
+  dw = Math.max(1, Math.round(dw)); dh = Math.max(1, Math.round(dh));
+  let cur = src, cx = sx, cy = sy, cw = sw, ch = sh;
+  while (cw / 2 >= dw && ch / 2 >= dh) {
+    const half = document.createElement("canvas");
+    half.width = Math.round(cw / 2); half.height = Math.round(ch / 2);
+    const hx = half.getContext("2d"); hx.imageSmoothingQuality = "high";
+    hx.drawImage(cur, cx, cy, cw, ch, 0, 0, half.width, half.height);
+    cur = half; cx = 0; cy = 0; cw = half.width; ch = half.height;
+  }
+  const out = document.createElement("canvas"); out.width = dw; out.height = dh;
+  const ox = out.getContext("2d"); ox.imageSmoothingQuality = "high";
+  ox.drawImage(cur, cx, cy, cw, ch, 0, 0, dw, dh);
+  return out;
+}
+
+// The soft duck-colored studio backdrop (warm cream in the middle, butter-yellow edges).
+function studioBackdrop() {
+  const c = document.createElement("canvas"); c.width = OUT_W; c.height = OUT_H;
+  const x = c.getContext("2d");
+  const bg = x.createRadialGradient(OUT_W / 2, OUT_H * 0.42, 30, OUT_W / 2, OUT_H * 0.5, OUT_W * 0.78);
+  bg.addColorStop(0, "#FFFEF8"); bg.addColorStop(0.5, "#FFF6DA"); bg.addColorStop(1, "#FBE3A0");
+  x.fillStyle = bg; x.fillRect(0, 0, OUT_W, OUT_H);
+  return { c, x };
+}
+
+// Without editing: keep the photo as it is, but always in the shop's 4:3 shape
+// (the whole photo fits inside; never cut, never stretched more than 1.5x).
 async function plainPhoto(file) {
   const bmp = await bitmapOf(file);
-  const s = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
-  const c = document.createElement("canvas");
-  c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
-  const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
-  x.drawImage(bmp, 0, 0, c.width, c.height);
-  return canvasToJpeg(c);
+  const k = Math.min(OUT_W / bmp.width, OUT_H / bmp.height, MAX_ENLARGE);
+  const dw = bmp.width * k, dh = bmp.height * k;
+  const { c, x } = studioBackdrop();
+  x.drawImage(scaledCanvas(bmp, 0, 0, bmp.width, bmp.height, dw, dh), Math.round((OUT_W - dw) / 2), Math.round((OUT_H - dh) / 2));
+  return canvasToJpeg(c, 0.9);
 }
 
 let bgLib = null;
 async function studioPhoto(file, onStatus) {
-  // 1) shrink big phone photos first so it runs faster
+  // 1) shrink very big phone photos (max 2000px) so it runs faster but stays sharp
   const bmp = await bitmapOf(file);
-  const s = Math.min(1, 1500 / Math.max(bmp.width, bmp.height));
-  const pre = document.createElement("canvas");
-  pre.width = Math.round(bmp.width * s); pre.height = Math.round(bmp.height * s);
-  pre.getContext("2d").drawImage(bmp, 0, 0, pre.width, pre.height);
+  const s = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+  const pre = scaledCanvas(bmp, 0, 0, bmp.width, bmp.height, bmp.width * s, bmp.height * s);
   const small = await new Promise(r => pre.toBlob(r, "image/png"));
 
   // 2) remove the background (runs in this browser; first time downloads the tool, ~40 MB)
@@ -206,25 +233,22 @@ async function studioPhoto(file, onStatus) {
   if (x1 < 0) throw new Error("Could not find the product in this photo. Try turning off automatic editing.");
   const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
 
-  // 4) soft duck-colored studio backdrop (warm cream light in the middle, soft butter-yellow edges)
-  const c = document.createElement("canvas"); c.width = OUT_W; c.height = OUT_H;
-  const x = c.getContext("2d");
-  const bg = x.createRadialGradient(OUT_W / 2, OUT_H * 0.42, 30, OUT_W / 2, OUT_H * 0.5, OUT_W * 0.78);
-  bg.addColorStop(0, "#FFFEF8"); bg.addColorStop(0.5, "#FFF6DA"); bg.addColorStop(1, "#FBE3A0");
-  x.fillStyle = bg; x.fillRect(0, 0, OUT_W, OUT_H);
+  // 4) soft duck-colored studio backdrop with a gentle "floor"
+  const { c, x } = studioBackdrop();
   const floor = x.createLinearGradient(0, OUT_H * 0.64, 0, OUT_H);
   floor.addColorStop(0, "rgba(255,255,255,0)"); floor.addColorStop(1, "rgba(240,196,92,.30)");
   x.fillStyle = floor; x.fillRect(0, OUT_H * 0.64, OUT_W, OUT_H * 0.36);
 
-  // 5) place the product (untouched) in the middle, standing on the "floor"
-  const k = Math.min((OUT_W * 0.78) / bw, (OUT_H * 0.76) / bh, 3);
-  const dw = bw * k, dh = bh * k, dx = (OUT_W - dw) / 2, dy = OUT_H * 0.9 - dh;
+  // 5) place the product (untouched, same proportions) in the middle, standing on the "floor".
+  //    Tall products (or rotated photos) fit by height, wide ones by width; never stretched more than 1.5x.
+  const k = Math.min((OUT_W * 0.8) / bw, (OUT_H * 0.78) / bh, MAX_ENLARGE);
+  const dw = bw * k, dh = bh * k, dx = Math.round((OUT_W - dw) / 2), dy = Math.round(OUT_H * 0.9 - dh);
   x.save();
-  x.filter = "blur(14px)"; x.fillStyle = "rgba(120,80,10,.22)";
-  x.beginPath(); x.ellipse(OUT_W / 2, dy + dh - 2, dw * 0.42, Math.max(8, dh * 0.045), 0, 0, Math.PI * 2); x.fill();
+  x.filter = "blur(18px)"; x.fillStyle = "rgba(120,80,10,.22)";
+  x.beginPath(); x.ellipse(OUT_W / 2, dy + dh - 2, dw * 0.42, Math.max(10, dh * 0.045), 0, 0, Math.PI * 2); x.fill();
   x.restore();
-  x.drawImage(cut, x0, y0, bw, bh, dx, dy, dw, dh);
-  return canvasToJpeg(c, 0.88);
+  x.drawImage(scaledCanvas(cut, x0, y0, bw, bh, dw, dh), dx, dy);
+  return canvasToJpeg(c, 0.9);
 }
 
 function previewBlob(blob) {
@@ -242,6 +266,8 @@ function previewUrl(url) {
 let chosenFile = null;   // last photo taken with the camera or picked from the gallery
 let rotation = 0;        // 0, 90, 180 or 270 degrees (clockwise)
 
+// Turn the photo a quarter (or half) turn. A quarter turn swaps width and height exactly,
+// so nothing is cut or squeezed. Saved as PNG so no quality is lost before editing.
 async function rotateBlob(blob, deg) {
   const bmp = await bitmapOf(blob);
   const side = deg % 180 !== 0;
@@ -250,7 +276,7 @@ async function rotateBlob(blob, deg) {
   const x = c.getContext("2d");
   x.translate(c.width / 2, c.height / 2); x.rotate(deg * Math.PI / 180);
   x.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
-  return canvasToJpeg(c, 0.95);
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("Could not turn the photo")), "image/png"));
 }
 
 async function rotate(step) {
