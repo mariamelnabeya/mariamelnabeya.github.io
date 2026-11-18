@@ -206,13 +206,19 @@ async function studioPhoto(file, onStatus) {
   const bmp = await bitmapOf(file);
   const s = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
   const pre = scaledCanvas(bmp, 0, 0, bmp.width, bmp.height, bmp.width * s, bmp.height * s);
-  const small = await new Promise(r => pre.toBlob(r, "image/png"));
+
+  // The tool looks at a copy with stronger contrast and colors, so pale parts of a gift
+  // (a white card, a clear bag) stand out from the background and are not erased.
+  // The gift itself keeps its real, untouched colors: only the shape is taken from the copy.
+  const guide = document.createElement("canvas"); guide.width = pre.width; guide.height = pre.height;
+  const gx = guide.getContext("2d"); gx.filter = "contrast(1.9) saturate(3) brightness(0.95)"; gx.drawImage(pre, 0, 0);
+  const small = await new Promise(r => guide.toBlob(r, "image/png"));
 
   // 2) remove the background (runs in this browser; first time downloads the tool, ~40 MB)
   onStatus("Getting the photo tool ready… (the first time can take up to a minute)");
   bgLib = bgLib || await import(BG_REMOVAL);
   onStatus("Removing the background…");
-  const cutBlob = await bgLib.removeBackground(small, {
+  const shapeBlob = await bgLib.removeBackground(small, {
     model: "isnet_fp16",
     output: { format: "image/png" },
     progress: (key, cur, total) => {
@@ -220,12 +226,18 @@ async function studioPhoto(file, onStatus) {
       else onStatus("Removing the background… (about 10 to 30 seconds)");
     }
   });
-  const cut = await bitmapOf(cutBlob);
+  const shape = await bitmapOf(shapeBlob);
 
-  // 3) find where the product is (ignore almost-transparent pixels)
-  const tc = document.createElement("canvas"); tc.width = cut.width; tc.height = cut.height;
-  const tx = tc.getContext("2d"); tx.drawImage(cut, 0, 0);
-  const a = tx.getImageData(0, 0, cut.width, cut.height).data;
+  // 3) cut the untouched photo with that shape, and find where the product is
+  const cut = document.createElement("canvas"); cut.width = pre.width; cut.height = pre.height;
+  const cx = cut.getContext("2d");
+  const sc = document.createElement("canvas"); sc.width = pre.width; sc.height = pre.height;
+  sc.getContext("2d").drawImage(shape, 0, 0, pre.width, pre.height);
+  const mask = sc.getContext("2d").getImageData(0, 0, pre.width, pre.height).data;
+  const real = pre.getContext("2d").getImageData(0, 0, pre.width, pre.height);
+  const a = real.data;
+  for (let i = 3; i < a.length; i += 4) a[i] = mask[i];
+  cx.putImageData(real, 0, 0);
   let x0 = cut.width, y0 = cut.height, x1 = -1, y1 = -1;
   for (let y = 0; y < cut.height; y++) for (let x = 0; x < cut.width; x++) {
     if (a[(y * cut.width + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
