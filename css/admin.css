@@ -1,0 +1,70 @@
+/* Admin page only. Builds on style.css (same duck colors and fonts). */
+[hidden]{display:none!important}
+.admin-top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 20px;background:linear-gradient(#FFE680,#FFD43B);border-bottom-left-radius:28px;border-bottom-right-radius:28px}
+.admin-top h1{font-size:clamp(1.3rem,4vw,1.8rem)}
+.admin-nav{display:flex;flex-wrap:wrap;gap:8px}
+.admin-nav .ghost{background:#fff;text-decoration:none;font:700 .9rem Nunito;display:inline-block}
+.admin-main{max-width:1000px;margin:0 auto;padding:22px 16px 60px}
+.panel{background:#fff;border:2px solid var(--line);border-radius:22px;padding:22px;margin-bottom:18px}
+.login{max-width:380px;margin:30px auto}
+.login form{display:grid;gap:12px}
+label{display:grid;gap:4px;font-weight:700;font-size:.92rem}
+label input,label textarea{font:inherit;font-weight:400}
+textarea{font:inherit;padding:11px 14px;border:2px solid var(--line);border-radius:14px;resize:vertical}
+.muted{color:var(--soft)}
+.small{font-size:.85rem}
+.center{text-align:center}
+.import{background:#FFF7D6}
+.admin-tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px}
+.admin-tools input{flex:1;min-width:180px}
+.admin-tools p{margin:0;width:100%}
+.big{font-size:1.05rem;padding:13px 20px}
+
+.gift-list{display:grid;gap:10px}
+.g-row{display:grid;grid-template-columns:84px 1fr auto;gap:12px;align-items:center;background:#fff;border:2px solid var(--line);border-radius:18px;padding:10px}
+.g-row.is-hidden{opacity:.6;border-style:dashed}
+.g-row.is-out{border-color:var(--pink)}
+.g-row img{width:84px;height:63px;object-fit:cover;border-radius:12px;background:var(--butter)}
+.g-info b{font:600 1.05rem Fredoka}
+.g-info small{display:block;color:var(--soft)}
+.g-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.g-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}
+.g-actions button{padding:7px 12px;border-radius:12px}
+.stock{display:flex;align-items:center;gap:6px;background:#FFF7D6;border-radius:999px;padding:3px}
+.stock button{width:32px;height:32px;padding:0;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:1.1rem}
+.stock span{min-width:2.2em;text-align:center;font-weight:700}
+.danger{background:#fff;border:2px solid #F3C1CD;color:#B0234A;border-radius:12px}
+@media(max-width:640px){
+  .g-row{grid-template-columns:64px 1fr}
+  .g-row img{width:64px;height:48px}
+  .g-actions{grid-column:1/-1;justify-content:flex-start}
+}
+
+.editor{width:min(640px,96%);max-height:94vh;overflow:auto}
+.editor form{display:grid;gap:12px}
+.editor-head{display:flex;justify-content:space-between;align-items:center}
+.x{border:0;background:none;font-size:1.2rem}
+.photo-area{display:grid;grid-template-columns:240px 1fr;gap:14px;align-items:start}
+.photo-preview{aspect-ratio:4/3;border-radius:16px;background:var(--butter);display:grid;place-items:center;overflow:hidden;border:2px solid var(--line)}
+.photo-preview img{width:100%;height:100%;object-fit:contain;background:#fff}
+.photo-controls{display:grid;gap:10px}
+.file-btn{display:inline-block;text-align:center;cursor:pointer}
+.check{display:flex;gap:8px;align-items:flex-start;font-weight:600}
+.check input{margin-top:4px;width:18px;height:18px;flex:none}
+.check small{display:block;font-weight:400;color:var(--soft)}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:12px;overflow:hidden;justify-self:start}
+.seg button{border:0;background:#fff;padding:6px 12px}
+.seg button.on{background:var(--duck)}
+.grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+@media(max-width:560px){.photo-area,.grid3{grid-template-columns:1fr}}
+
+.reviewer{width:min(820px,96%)}
+.rev-name{margin:0 0 8px;font:600 1.3rem Fredoka}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.compare figure{margin:0;display:grid;gap:4px}
+.compare figcaption{font-weight:700}
+.compare img,.rev-new{width:100%;aspect-ratio:4/3;object-fit:contain;border-radius:14px;border:2px solid var(--line);background:#fff}
+.rev-new{display:grid;place-items:center;overflow:hidden}
+.rev-new img{width:100%;height:100%;object-fit:contain}
+.rev-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+@media(max-width:560px){.compare{grid-template-columns:1fr}}

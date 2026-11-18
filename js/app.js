@@ -1,0 +1,170 @@
+const $ = id => document.getElementById(id);
+const KEY = "duckshop-selection";
+let gifts = [];
+let cart = {}; // id -> quantity
+
+function loadCart() {
+  try { cart = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { cart = {}; }
+}
+function saveCart() {
+  try { localStorage.setItem(KEY, JSON.stringify(cart)); } catch {}
+}
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// Gifts come from Supabase (kept up to date from the admin page).
+// If Supabase can't be reached, the shop shows the starter list in gifts.json.
+async function loadGifts() {
+  if (CONFIG.supabaseUrl && CONFIG.supabaseKey) {
+    try {
+      const res = await fetch(`${CONFIG.supabaseUrl}/rest/v1/gifts?select=id,name,description,category,points,stock,image&hidden=eq.false&order=id`,
+        { headers: { apikey: CONFIG.supabaseKey }, cache: "no-store" });
+      if (!res.ok) throw new Error(res.status);
+      const list = await res.json();
+      if (list.length) return list;
+    } catch (e) { console.warn("Supabase not reachable, using gifts.json", e); }
+  }
+  const res = await fetch("gifts.json");
+  if (!res.ok) throw new Error(res.status);
+  return res.json();
+}
+
+async function init() {
+  loadCart();
+  try {
+    gifts = await loadGifts();
+  } catch {
+    $("status").textContent = "Sorry, the gifts could not be loaded. Please check your internet and refresh the page.";
+    return;
+  }
+  Object.keys(cart).forEach(id => { const g = gifts.find(x => String(x.id) === id); if (!g || g.stock < 1) delete cart[id]; else cart[id] = Math.min(cart[id], g.stock); });
+  [...new Set(gifts.map(g => g.category))].sort().forEach(c => {
+    const o = document.createElement("option"); o.value = c; o.textContent = c; $("category").appendChild(o);
+  });
+  ["search", "sort", "stock", "category"].forEach(id => $(id).addEventListener("input", renderGrid));
+  renderGrid(); renderCart();
+}
+
+function renderGrid() {
+  const q = $("search").value.trim().toLowerCase();
+  const stock = $("stock").value, cat = $("category").value, sort = $("sort").value;
+  let list = gifts.filter(g =>
+    (!q || [g.name, g.description, g.category].join(" ").toLowerCase().includes(q)) &&
+    (stock === "all" || (stock === "in") === (g.stock > 0)) &&
+    (cat === "all" || g.category === cat));
+  const by = {
+    "points-asc": (a, b) => a.points - b.points, "points-desc": (a, b) => b.points - a.points,
+    "name-asc": (a, b) => a.name.localeCompare(b.name), "name-desc": (a, b) => b.name.localeCompare(a.name)
+  }[sort];
+  list.sort(by);
+  $("status").textContent = list.length ? `${list.length} gift${list.length === 1 ? "" : "s"}` : "";
+  const grid = $("grid"); grid.innerHTML = "";
+  if (!list.length) { grid.innerHTML = '<p class="empty">No gifts match. Try a different word or clear the filters.</p>'; return; }
+  list.forEach(g => {
+    const card = document.createElement("article"); card.className = "card";
+    const thumb = document.createElement("div"); thumb.className = "thumb";
+    const img = new Image(); img.alt = g.name; img.loading = "lazy";
+    img.onerror = () => { img.onerror = null; img.src = "assets/duck.svg"; img.classList.add("ph"); };
+    img.src = g.image || "missing";
+    thumb.appendChild(img);
+    thumb.tabIndex = 0; thumb.setAttribute("role", "button"); thumb.setAttribute("aria-label", `See ${g.name} bigger`);
+    thumb.onclick = () => openPhoto(g);
+    thumb.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPhoto(g); } };
+    const body = document.createElement("div"); body.className = "body";
+    const h = document.createElement("h3"); h.textContent = g.name;
+    const p = document.createElement("p"); p.textContent = g.description;
+    const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = g.category;
+    const av = document.createElement("span"); av.className = "tag" + (g.stock > 0 ? "" : " out"); av.textContent = g.stock > 0 ? (g.stock <= 3 ? `Only ${g.stock} left` : `${g.stock} left`) : "Out of stock";
+    const pr = document.createElement("div"); pr.className = "price"; pr.textContent = `${g.points} Ducks`;
+    const btn = document.createElement("button"); btn.className = "primary"; btn.textContent = "Add to My Selection";
+    btn.disabled = !(g.stock > 0);
+    btn.onclick = () => addOne(g);
+    body.append(tag, h, p, av, pr, btn);
+    card.append(thumb, body); grid.appendChild(card);
+  });
+}
+
+function addOne(g) {
+  if ((cart[g.id] || 0) >= g.stock) { toast(`That is all we have of ${g.name}`); return; }
+  cart[g.id] = (cart[g.id] || 0) + 1; saveCart(); renderCart(); toast(`${g.name} added`);
+}
+
+// Big photo view (tap a gift photo)
+function openPhoto(g) {
+  const big = $("photoBig");
+  big.onerror = () => { big.onerror = null; big.src = "assets/duck.svg"; };
+  big.src = g.image || "assets/duck.svg"; big.alt = g.name;
+  $("photoName").textContent = g.name;
+  $("photoDesc").textContent = g.description || "";
+  $("photoPrice").textContent = `${g.points} Ducks`;
+  const st = $("photoStock");
+  st.className = "tag" + (g.stock > 0 ? "" : " out");
+  st.textContent = g.stock > 0 ? (g.stock <= 3 ? `Only ${g.stock} left` : `${g.stock} left`) : "Out of stock";
+  $("photoAdd").disabled = !(g.stock > 0);
+  $("photoAdd").onclick = () => { addOne(g); $("photoView").close(); };
+  $("photoView").showModal();
+}
+$("photoClose").onclick = () => $("photoView").close();
+$("photoView").addEventListener("click", e => { if (e.target === $("photoView")) $("photoView").close(); });
+
+function cartLines() {
+  return Object.entries(cart).map(([id, qty]) => ({ g: gifts.find(x => String(x.id) === id), qty })).filter(l => l.g);
+}
+function renderCart() {
+  const lines = cartLines(), box = $("items"); box.innerHTML = "";
+  let n = 0, pts = 0;
+  if (!lines.length) box.innerHTML = '<p class="empty">Nothing selected yet. Add a gift from the catalog.</p>';
+  lines.forEach(({ g, qty }) => {
+    n += qty; pts += qty * g.points;
+    const row = document.createElement("div"); row.className = "item";
+    const t = document.createElement("div"); t.innerHTML = "<b></b><br><small></small>";
+    t.querySelector("b").textContent = g.name; t.querySelector("small").textContent = `${g.points} Ducks each = ${g.points * qty} Ducks`;
+    const q = document.createElement("div"); q.className = "qty";
+    const minus = document.createElement("button"); minus.textContent = "−"; minus.setAttribute("aria-label", "Decrease");
+    const num = document.createElement("span"); num.textContent = qty;
+    const plus = document.createElement("button"); plus.textContent = "+"; plus.setAttribute("aria-label", "Increase");
+    minus.onclick = () => { cart[g.id] = qty - 1; if (cart[g.id] < 1) delete cart[g.id]; saveCart(); renderCart(); };
+    plus.onclick = () => { if (qty >= g.stock) { toast(`That is all we have of ${g.name}`); return; } cart[g.id] = qty + 1; saveCart(); renderCart(); };
+    q.append(minus, num, plus);
+    const rm = document.createElement("button"); rm.className = "rm"; rm.textContent = "Remove";
+    rm.onclick = () => { delete cart[g.id]; saveCart(); renderCart(); };
+    row.append(t, q, rm); box.appendChild(row);
+  });
+  $("totalGifts").textContent = n; $("totalPoints").textContent = pts;
+  $("cartCount").textContent = n; $("submitBtn").disabled = !n;
+}
+
+function openCart(open) {
+  $("drawer").classList.toggle("open", open); $("overlay").classList.toggle("show", open);
+  $("drawer").setAttribute("aria-hidden", String(!open));
+}
+$("openCart").onclick = () => openCart(true);
+$("closeCart").onclick = $("overlay").onclick = () => openCart(false);
+$("clearBtn").onclick = () => { cart = {}; saveCart(); renderCart(); };
+$("submitBtn").onclick = () => { $("nameError").textContent = ""; $("nameDialog").showModal(); $("nameInput").focus(); };
+$("nameCancel").onclick = () => $("nameDialog").close();
+
+function makeRef() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let r = "";
+  for (let i = 0; i < 6; i++) r += chars[Math.floor(Math.random() * chars.length)];
+  return CONFIG.refPrefix + r;
+}
+function buildMessage(name) {
+  const lines = cartLines();
+  const n = lines.reduce((s, l) => s + l.qty, 0), pts = lines.reduce((s, l) => s + l.qty * l.g.points, 0);
+  return [`🦆 ${CONFIG.hashtag}`, `Order ref: ${makeRef()}`, `Name: ${name}`, "", "Gifts:",
+    ...lines.map(l => `• ${l.g.name} x${l.qty} = ${l.qty * l.g.points} Ducks`), "",
+    `Total gifts: ${n}`, `Total Ducks: ${pts}`].join("\n");
+}
+$("nameForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const name = $("nameInput").value.trim().replace(/\s+/g, " ");
+  if (name.length < 2) { $("nameError").textContent = "Please enter your name (at least 2 letters)."; return; }
+  const url = `https://wa.me/${CONFIG.whatsappNumber}?text=${encodeURIComponent(buildMessage(name))}`;
+  window.open(url, "_blank", "noopener");
+  $("nameDialog").close();
+  toast("WhatsApp opened. Press send there to finish.");
+});
+init();

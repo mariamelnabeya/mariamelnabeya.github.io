@@ -1,0 +1,218 @@
+[
+  {
+    "id": 1,
+    "name": "Big Notebook",
+    "description": "Large spiral notebook with lined pages.",
+    "category": "Stationery",
+    "points": 30,
+    "stock": 5,
+    "image": "assets/images/big-notebook.jpg"
+  },
+  {
+    "id": 2,
+    "name": "Big Slim",
+    "description": "Big glittery slime in a unicorn bottle.",
+    "category": "Toys",
+    "points": 35,
+    "stock": 4,
+    "image": "assets/images/big-slim.jpg"
+  },
+  {
+    "id": 3,
+    "name": "Bottle",
+    "description": "Pastel flask with a carry loop.",
+    "category": "Home",
+    "points": 30,
+    "stock": 10,
+    "image": "assets/images/bottle.jpg"
+  },
+  {
+    "id": 4,
+    "name": "Glow Lollipop",
+    "description": "Glow-in-the-dark stick lollipop toy.",
+    "category": "Toys",
+    "points": 20,
+    "stock": 2,
+    "image": "assets/images/glow-lollipop.jpg"
+  },
+  {
+    "id": 5,
+    "name": "Butterfly TikTok",
+    "description": "Gold butterfly and pearl star hair clips.",
+    "category": "Accessories",
+    "points": 18,
+    "stock": 3,
+    "image": "assets/images/butterfly-tiktok.jpg"
+  },
+  {
+    "id": 6,
+    "name": "Colorful Ball",
+    "description": "Soft rainbow foam ball on a string.",
+    "category": "Toys",
+    "points": 20,
+    "stock": 6,
+    "image": "assets/images/colorful-ball.jpg"
+  },
+  {
+    "id": 7,
+    "name": "Cross Bags",
+    "description": "Small zip pouch in several colors.",
+    "category": "Accessories",
+    "points": 60,
+    "stock": 3,
+    "image": "assets/images/cross-bags.jpg"
+  },
+  {
+    "id": 8,
+    "name": "Cross Bracelets",
+    "description": "Colorful beaded bracelet with a cross charm.",
+    "category": "Accessories",
+    "points": 15,
+    "stock": 8,
+    "image": "assets/images/cross-bracelets.jpg"
+  },
+  {
+    "id": 9,
+    "name": "Duck Family",
+    "description": "Rubber duck set: one mama duck and two ducklings.",
+    "category": "Toys",
+    "points": 50,
+    "stock": 3,
+    "image": "assets/images/duck-family.jpg"
+  },
+  {
+    "id": 10,
+    "name": "Earrings",
+    "description": "Stud earrings set in a small gift box.",
+    "category": "Accessories",
+    "points": 15,
+    "stock": 4,
+    "image": "assets/images/earrings.jpg"
+  },
+  {
+    "id": 11,
+    "name": "File For Topics",
+    "description": "Zip document folder with a science print.",
+    "category": "Stationery",
+    "points": 30,
+    "stock": 4,
+    "image": "assets/images/file-for-topics.jpg"
+  },
+  {
+    "id": 12,
+    "name": "Free Coupon Cafeteria Roof",
+    "description": "Free coupon for the cafeteria roof.",
+    "category": "Coupons",
+    "points": 20,
+    "stock": 10,
+    "image": "assets/images/free-coupon-cafeteria-roof.jpg"
+  },
+  {
+    "id": 13,
+    "name": "Hair Tie",
+    "description": "Bright stretchy hair ties.",
+    "category": "Accessories",
+    "points": 7,
+    "stock": 2,
+    "image": "assets/images/hair-tie.jpg"
+  },
+  {
+    "id": 14,
+    "name": "Lego",
+    "description": "Mini brick building set.",
+    "category": "Toys",
+    "points": 20,
+    "stock": 2,
+    "image": "assets/images/lego.jpg"
+  },
+  {
+    "id": 15,
+    "name": "Magnet",
+    "description": "Pair of shiny green magnet cubes.",
+    "category": "Home",
+    "points": 10,
+    "stock": 7,
+    "image": "assets/images/magnet.jpg"
+  },
+  {
+    "id": 16,
+    "name": "Scratch Book",
+    "description": "Scratch paper notebook with a wooden stylus.",
+    "category": "Stationery",
+    "points": 25,
+    "stock": 8,
+    "image": "assets/images/scratch-book.jpg"
+  },
+  {
+    "id": 17,
+    "name": "Slim",
+    "description": "Glittery slime in a jar, in several colors.",
+    "category": "Toys",
+    "points": 25,
+    "stock": 8,
+    "image": "assets/images/slim.jpg"
+  },
+  {
+    "id": 18,
+    "name": "Small Slim",
+    "description": "Soft marbled slime in a cute bottle with a charm on top.",
+    "category": "Toys",
+    "points": 28,
+    "stock": 3,
+    "image": "assets/images/small-slim.jpg"
+  },
+  {
+    "id": 19,
+    "name": "Small Ball",
+    "description": "Bouncy ball in swirly colors.",
+    "category": "Toys",
+    "points": 8,
+    "stock": 40,
+    "image": "assets/images/small-ball.jpg"
+  },
+  {
+    "id": 20,
+    "name": "Sosta",
+    "description": "Stretchy coil keychain with a clip, in bright yellow.",
+    "category": "Accessories",
+    "points": 20,
+    "stock": 10,
+    "image": "assets/images/sosta.jpg"
+  },
+  {
+    "id": 21,
+    "name": "Strawberry Fan",
+    "description": "Foldable hand fan with a fruit print.",
+    "category": "Accessories",
+    "points": 30,
+    "stock": 7,
+    "image": "assets/images/strawbery-fan.jpg"
+  },
+  {
+    "id": 22,
+    "name": "Sunday",
+    "description": "A sundae treat voucher.",
+    "category": "Coupons",
+    "points": 50,
+    "stock": 10,
+    "image": "assets/images/sunday.jpg"
+  },
+  {
+    "id": 23,
+    "name": "Tablet",
+    "description": "6.5 inch LCD writing tablet. Draw, write and erase with one key.",
+    "category": "Stationery",
+    "points": 40,
+    "stock": 10,
+    "image": "assets/images/tablet.jpg"
+  },
+  {
+    "id": 24,
+    "name": "Toka Warda",
+    "description": "Big flower hair clip.",
+    "category": "Accessories",
+    "points": 15,
+    "stock": 9,
+    "image": "assets/images/toka-warda.jpg"
+  }
+]

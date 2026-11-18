@@ -1,0 +1,21 @@
+# Keeps the free Supabase project awake by reading the gift list every 3 days.
+# Supabase pauses free projects after 7 days without database activity.
+# The key below is the PUBLIC publishable key (the same one in js/config.js). It is safe here.
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: "17 6 */3 * *"   # every 3 days at 06:17 UTC
+  workflow_dispatch:          # lets you run it by hand from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read the gift list
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: sb_publishable_5uf9JasQSKA67lInlbkEkQ_v3xO0j27" \
+            "https://zdbmkzlgxkxullqmxspv.supabase.co/rest/v1/gifts?select=id&limit=1")
+          echo "Supabase answered: $code"
+          test "$code" = "200"

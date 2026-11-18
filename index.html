@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mariam El Nabeya Duck Shop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="assets/duck.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <h1><img src="assets/duck.svg" alt="" class="logo"> Mariam El Nabeya Duck Shop</h1>
+  <p>Trade your Ducks for real gifts.</p>
+  <button id="openCart" class="cart-btn">My Selection <span id="cartCount">0</span></button>
+  <div class="pond" aria-hidden="true">
+    <img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt="">
+    <svg viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 18 Q50 4 100 18 T200 18 T300 18 T400 18 T500 18 T600 18 T700 18 T800 18 T900 18 T1000 18 T1100 18 T1200 18 V40 H0Z" fill="#CBEAF7"/><path d="M0 28 Q60 14 120 28 T240 28 T360 28 T480 28 T600 28 T720 28 T840 28 T960 28 T1080 28 T1200 28 V40 H0Z" fill="#A9DBF0"/></svg>
+  </div>
+</header>
+<main>
+  <section class="tools">
+    <input id="search" type="search" placeholder="Search by name, description or category" aria-label="Search gifts">
+    <select id="sort" aria-label="Sort gifts">
+      <option value="points-asc">Ducks: low to high</option>
+      <option value="points-desc">Ducks: high to low</option>
+      <option value="name-asc">Name: A to Z</option>
+      <option value="name-desc">Name: Z to A</option>
+    </select>
+    <select id="stock" aria-label="Filter by availability">
+      <option value="all">All gifts</option>
+      <option value="in">Available</option>
+      <option value="out">Out of stock</option>
+    </select>
+    <select id="category" aria-label="Filter by category"><option value="all">All categories</option></select>
+  </section>
+  <p id="status" class="status" role="status"></p>
+  <section id="grid" class="grid"></section>
+</main>
+<footer class="foot">
+  <div class="ducks" aria-hidden="true"><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""><img src="assets/duck.svg" alt=""></div>
+  <p>Collect Ducks. Pick a gift. Send your request on WhatsApp.</p>
+</footer>
+<section class="xmas">
+  <div class="xmas-ducks" aria-hidden="true"><img src="assets/duck-santa.svg" alt=""><img src="assets/duck-santa.svg" alt=""><img src="assets/duck-santa.svg" alt=""></div>
+  <p class="xmas-title">Wait for our Christmas Collection Soon</p>
+  <p class="xmas-flakes" aria-hidden="true">❄ 🎄 ❄</p>
+</section>
+
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <div class="drawer-head"><h2>My Selection</h2><button id="closeCart" aria-label="Close">✕</button></div>
+  <div id="items" class="items"></div>
+  <div class="drawer-foot">
+    <p>Total gifts: <b id="totalGifts">0</b></p>
+    <p>Total Ducks: <b id="totalPoints">0</b></p>
+    <button id="submitBtn" class="primary">Submit My Request</button>
+    <button id="clearBtn" class="ghost">Clear selection</button>
+    <p class="note">Your request is sent through WhatsApp. It is not saved on this website.</p>
+  </div>
+</aside>
+<div id="overlay" class="overlay"></div>
+
+<dialog id="nameDialog">
+  <form method="dialog" id="nameForm">
+    <h2>Who is this request from?</h2>
+    <input id="nameInput" type="text" maxlength="40" placeholder="Your name" autocomplete="name">
+    <p id="nameError" class="error"></p>
+    <div class="row"><button type="button" id="nameCancel" class="ghost">Cancel</button><button type="submit" class="primary">Open WhatsApp</button></div>
+  </form>
+</dialog>
+<dialog id="photoView" class="photo-view" aria-label="Gift photo">
+  <button type="button" id="photoClose" class="photo-close" aria-label="Close">✕</button>
+  <img id="photoBig" alt="">
+  <div class="photo-cap">
+    <div><b id="photoName"></b><span id="photoStock" class="tag"></span></div>
+    <p id="photoDesc"></p>
+    <div class="photo-row"><span id="photoPrice" class="price"></span><button type="button" id="photoAdd" class="primary">Add to My Selection</button></div>
+  </div>
+</dialog>
+<div id="toast" class="toast" role="status"></div>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

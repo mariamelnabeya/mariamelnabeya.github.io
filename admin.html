@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin · Mariam El Nabeya Duck Shop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="assets/duck.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin">
+<header class="admin-top">
+  <h1><img src="assets/duck.svg" alt="" class="logo"> Duck Shop Admin</h1>
+  <nav id="adminNav" class="admin-nav" hidden>
+    <a href="index.html" target="_blank" rel="noopener" class="ghost">Open shop ↗</a>
+    <button id="backupBtn" class="ghost">Download backup</button>
+    <button id="signOutBtn" class="ghost">Sign out</button>
+  </nav>
+</header>
+
+<main class="admin-main">
+  <!-- Login -->
+  <section id="loginView" class="panel login" hidden>
+    <h2>Sign in</h2>
+    <p class="muted">Only for the shop owner.</p>
+    <form id="loginForm">
+      <label>Email <input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label>Password <input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <p id="loginError" class="error"></p>
+      <button class="primary" type="submit">Sign in</button>
+    </form>
+  </section>
+
+  <!-- Signed in but not an admin -->
+  <section id="notAdminView" class="panel" hidden>
+    <h2>This account can't edit the shop</h2>
+    <p class="muted">You are signed in, but this account is not on the admin list.</p>
+    <button id="notAdminOut" class="ghost">Sign out</button>
+  </section>
+
+  <!-- Main admin view -->
+  <section id="mainView" hidden>
+    <div id="importBox" class="panel import" hidden>
+      <h2>Your shop is empty</h2>
+      <p>Copy your 24 starter gifts (with their photos) into the online shop. You only need to do this once.</p>
+      <button id="importBtn" class="primary">Import my starter gifts</button>
+    </div>
+
+    <div class="admin-tools">
+      <button id="addBtn" class="primary big">＋ Add a gift</button>
+      <button id="reeditBtn" class="ghost big">✨ Re-edit photos</button>
+      <input id="adminSearch" type="search" placeholder="Search your gifts" aria-label="Search your gifts">
+      <p id="adminCount" class="muted"></p>
+    </div>
+    <div id="giftList" class="gift-list"></div>
+  </section>
+
+  <p id="loading" class="muted center">Loading…</p>
+</main>
+
+<!-- Add / edit a gift -->
+<dialog id="editor" class="editor">
+  <form id="editForm">
+    <div class="editor-head">
+      <h2 id="editorTitle">Add a gift</h2>
+      <button type="button" id="editorClose" class="x" aria-label="Close">✕</button>
+    </div>
+
+    <div class="photo-area">
+      <div class="photo-preview" id="photoPreview"><span class="muted">No photo yet</span></div>
+      <div class="photo-controls">
+        <label class="primary file-btn">Choose a photo
+          <input id="photoInput" type="file" accept="image/*" hidden>
+        </label>
+        <label class="check"><input id="enhanceToggle" type="checkbox" checked>
+          <span>Make the photo pretty automatically <small>Removes the background and adds a soft studio backdrop.</small></span></label>
+        <div class="seg" id="viewSeg" hidden>
+          <button type="button" data-view="result" class="on">Edited</button>
+          <button type="button" data-view="original">Original</button>
+        </div>
+        <p id="photoStatus" class="muted small"></p>
+      </div>
+    </div>
+
+    <label>Gift name <input id="fName" maxlength="80" required placeholder="e.g. Glow Lollipop"></label>
+    <label>Description <textarea id="fDesc" maxlength="300" rows="2" placeholder="One short sentence about the gift"></textarea></label>
+    <div class="grid3">
+      <label>Category <input id="fCat" list="catList" maxlength="40" required placeholder="e.g. Toys"></label>
+      <label>Price (Ducks) <input id="fPoints" type="number" min="0" max="100000" step="1" required inputmode="numeric"></label>
+      <label>How many? <input id="fStock" type="number" min="0" max="100000" step="1" required inputmode="numeric"></label>
+    </div>
+    <datalist id="catList"></datalist>
+    <label class="check"><input id="fHidden" type="checkbox"> Hide this gift from the shop for now</label>
+
+    <p id="editError" class="error"></p>
+    <div class="row">
+      <button type="button" id="editorCancel" class="ghost">Cancel</button>
+      <button type="submit" id="saveBtn" class="primary">Publish</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Re-edit photos one by one -->
+<dialog id="reviewer" class="editor reviewer">
+  <div class="editor-head">
+    <h2>Re-edit photos</h2>
+    <button type="button" id="revClose" class="x" aria-label="Close">✕</button>
+  </div>
+  <div id="revStart">
+    <p>I will make a new edited photo for each gift, one by one. You look at <b>Old</b> and <b>New</b> and choose which one to keep. Nothing changes until you press <b>Use new photo</b>.</p>
+    <label class="check"><input id="revOnlyStarter" type="checkbox" checked>
+      <span>Only my 24 starter photos <small>Untick to go through every gift.</small></span></label>
+    <label class="check"><input id="revAuto" type="checkbox">
+      <span>Do them all for me <small>Saves every new photo by itself, without asking. You can still press Stop.</small></span></label>
+    <p class="muted small">Tip: if a new photo looks wrong, press <b>Use a different photo</b> and pick your original photo from the “Duck gifts” folder.</p>
+    <div class="row"><button type="button" id="revGo" class="primary">Start</button></div>
+  </div>
+  <div id="revWork" hidden>
+    <p class="muted" id="revProgress"></p>
+    <h3 id="revName" class="rev-name"></h3>
+    <div class="compare">
+      <figure><figcaption>Old</figcaption><img id="revOld" alt="Old photo"></figure>
+      <figure><figcaption>New</figcaption><div id="revNewBox" class="rev-new"><span class="muted">Working…</span></div></figure>
+    </div>
+    <p id="revStatus" class="muted small"></p>
+    <div class="rev-actions">
+      <button type="button" id="revUse" class="primary" disabled>Use new photo</button>
+      <button type="button" id="revKeep" class="ghost">Keep old</button>
+      <label class="ghost file-btn">Use a different photo<input id="revFile" type="file" accept="image/*" hidden></label>
+      <button type="button" id="revStop" class="ghost">Stop</button>
+    </div>
+  </div>
+  <div id="revDone" hidden>
+    <p id="revSummary"></p>
+    <div class="row"><button type="button" id="revFinish" class="primary">Close</button></div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status"></div>
+<script src="js/config.js"></script>
+<script type="module" src="js/admin.js"></script>
+</body>
+</html>
