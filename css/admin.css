@@ -72,3 +72,5 @@ textarea{font:inherit;padding:11px 14px;border:2px solid var(--line);border-radi
 .rev-new img{width:100%;height:100%;object-fit:contain}
 .rev-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 @media(max-width:560px){.compare{grid-template-columns:1fr}}
+.seg{align-items:center}
+.seg-label{padding:6px 4px 6px 10px;font-weight:700;color:var(--soft);background:#fff}

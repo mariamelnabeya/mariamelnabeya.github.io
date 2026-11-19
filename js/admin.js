@@ -136,6 +136,7 @@ async function removeGift(g) {
   const { error } = await sb.from("gifts").delete().eq("id", g.id);
   if (error) { toast(friendly(error), 4000); return; }
   await deletePhoto(g.image);
+  await deletePhoto(g.original_image);
   toast(`${g.name} deleted`);
   loadGifts();
 }
@@ -291,78 +292,115 @@ async function rotateBlob(blob, deg) {
   return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("Could not turn the photo")), "image/png"));
 }
 
+// Where the photo being edited came from:
+//   "new"      a photo just taken or picked from the gallery
+//   "original" the original photo kept for a gift that is already in the shop
+//   "saved"    an older gift with no kept original: only its edited photo exists
+let sourceKind = "new";
+let srcGen = 0;                       // changes whenever the photo or its rotation changes
+let cache = { gen: -1, source: null, studio: null, plain: null };
+
+// For a gift already in the shop with no new photo chosen: open its original (or, for older gifts, its saved photo).
+async function ensureSource() {
+  if (chosenFile) return true;
+  if (!editing || !editing.image) return false;
+  try {
+    $("photoStatus").textContent = "Opening the photo…";
+    const url = editing.original_image || imgSrc(editing);
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not open the photo.");
+    chosenFile = await res.blob();
+    sourceKind = editing.original_image ? "original" : "saved";
+    srcGen++;
+    return true;
+  } catch (err) { $("photoStatus").textContent = friendly(err); return false; }
+}
+
 async function rotate(step) {
-  if (!chosenFile) {
-    // Rotating the photo a gift already has: start from that photo.
-    if (!editing || !editing.image) return;
-    try {
-      $("photoStatus").textContent = "Opening the current photo…";
-      const res = await fetch(imgSrc(editing), { cache: "no-store" });
-      if (!res.ok) throw new Error("Could not open the current photo.");
-      chosenFile = await res.blob();
-    } catch (err) { $("photoStatus").textContent = friendly(err); return; }
-  }
+  if (!(await ensureSource())) return;
   rotation = (rotation + step + 360) % 360;
+  srcGen++;
   preparePhoto();
 }
 $("rotLeft").onclick = () => rotate(-90);
 $("rotRight").onclick = () => rotate(90);
 
+// Makes the photo that will be SAVED: the edited one ("Edited") or the original one ("Original"),
+// following the "Make the photo pretty" switch. Both versions are remembered,
+// so switching back and forth is instant after the first time.
 async function preparePhoto() {
   if (!chosenFile) return;
-  const file = rotation ? await rotateBlob(chosenFile, rotation) : chosenFile;
   const job = ++photoJob;
   const enhance = $("enhanceToggle").checked;
-  photo = { original: file, result: null };
-  previewBlob(file);
-  $("viewSeg").hidden = true;
-  $("saveBtn").disabled = true;
   const status = m => { if (job === photoJob) $("photoStatus").textContent = m; };
+  setSeg(enhance ? "result" : "original");
+  $("viewSeg").hidden = false;
+  $("saveBtn").disabled = true;
   try {
-    status(enhance ? "Working on the photo…" : "Preparing the photo…");
-    const result = enhance ? await studioPhoto(file, status) : await plainPhoto(file);
-    if (job !== photoJob) return;
-    photo.result = result;
-    previewBlob(result);
-    $("viewSeg").hidden = !enhance;
-    setSeg("result");
-    status(enhance ? "Done! Check the edited photo. Not happy? Untick “Make the photo pretty” to use the original." : "Photo ready.");
+    if (cache.gen !== srcGen) {
+      const gen = srcGen;
+      const source = rotation ? await rotateBlob(chosenFile, rotation) : chosenFile;
+      if (job !== photoJob) return;
+      cache = { gen, source, studio: null, plain: null };
+    }
+    const kind = enhance ? "studio" : "plain";
+    photo = { original: cache.source, result: cache[kind] };
+    if (!cache[kind]) {
+      previewBlob(cache.source);
+      status(enhance ? "Working on the photo…" : "Preparing the original photo…");
+      const result = enhance ? await studioPhoto(cache.source, status) : await plainPhoto(cache.source);
+      if (job !== photoJob) return;
+      cache[kind] = result;
+      photo.result = result;
+    }
+    previewBlob(photo.result);
+    if (enhance) status("✨ Edited photo will be saved. Tap “Original” to save the photo as it is.");
+    else if (sourceKind === "saved") status("This gift's original photo wasn't kept (it was added before this option existed). To use the real original, tap “Choose from gallery” and pick it.");
+    else status("Original photo will be saved (no background removal).");
   } catch (err) {
     if (job !== photoJob) return;
     console.error(err);
-    photo.result = null;
-    status("Sorry, automatic editing didn't work for this photo: " + friendly(err) + " Untick “Make the photo pretty” and choose the photo again.");
+    if (photo) photo.result = null;
+    status("Sorry, automatic editing didn't work for this photo: " + friendly(err) + " Tap “Original” to use the photo as it is.");
   } finally {
     if (job === photoJob) $("saveBtn").disabled = false;
   }
 }
 ["photoInput", "cameraInput"].forEach(id => $(id).addEventListener("change", e => {
   const f = e.target.files[0]; e.target.value = "";
-  if (f) { chosenFile = f; rotation = 0; $("rotateRow").hidden = false; preparePhoto(); }
+  if (f) { chosenFile = f; sourceKind = "new"; rotation = 0; srcGen++; $("rotateRow").hidden = false; preparePhoto(); }
 }));
-$("enhanceToggle").addEventListener("change", () => {
-  try { localStorage.setItem(ENHANCE_KEY, $("enhanceToggle").checked ? "1" : "0"); } catch {}
-  if (chosenFile) preparePhoto();
-});
+async function chooseVersion(enhance) {
+  $("enhanceToggle").checked = enhance;
+  try { localStorage.setItem(ENHANCE_KEY, enhance ? "1" : "0"); } catch {}
+  setSeg(enhance ? "result" : "original");
+  if (await ensureSource()) preparePhoto();
+}
+$("enhanceToggle").addEventListener("change", () => chooseVersion($("enhanceToggle").checked));
 function setSeg(v) {
   document.querySelectorAll("#viewSeg button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
 }
-document.querySelectorAll("#viewSeg button").forEach(b => b.onclick = () => {
-  if (!photo) return;
-  setSeg(b.dataset.view);
-  previewBlob(b.dataset.view === "original" ? photo.original : photo.result);
-});
+document.querySelectorAll("#viewSeg button").forEach(b => b.onclick = () => chooseVersion(b.dataset.view === "result"));
+
+// The original photo kept with each gift: upright (after rotation), max 2000px, so it can be re-edited later.
+async function originalForStorage(blob) {
+  const bmp = await bitmapOf(blob);
+  const s = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+  return canvasToJpeg(scaledCanvas(bmp, 0, 0, bmp.width, bmp.height, bmp.width * s, bmp.height * s), 0.9);
+}
 
 // ---------- add / edit ----------
 function openEditor(g = null) {
   editing = g; photo = null; chosenFile = null; rotation = 0; photoJob++;
+  sourceKind = "new"; srcGen++; cache = { gen: -1, source: null, studio: null, plain: null };
   $("rotateRow").hidden = !(g && g.image);
   $("editForm").reset();
   try { $("enhanceToggle").checked = localStorage.getItem(ENHANCE_KEY) !== "0"; } catch {}
   $("editorTitle").textContent = g ? `Edit ${g.name}` : "Add a gift";
   $("saveBtn").textContent = g ? "Save changes" : "Publish";
   $("saveBtn").disabled = false;
-  $("editError").textContent = ""; $("photoStatus").textContent = ""; $("viewSeg").hidden = true;
+  $("editError").textContent = ""; $("photoStatus").textContent = "";
+  $("viewSeg").hidden = !(g && g.image); setSeg($("enhanceToggle").checked ? "result" : "original");
   $("fName").value = g ? g.name : "";
   $("fDesc").value = g ? g.description : "";
   $("fCat").value = g ? g.category : "";
@@ -395,18 +433,26 @@ $("editForm").addEventListener("submit", async e => {
   if (photo && !photo.result) { err.textContent = "Please wait until the photo is ready (or untick “Make the photo pretty”)."; return; }
 
   const save = $("saveBtn"); save.disabled = true; save.textContent = "Saving…";
-  let newUrl = null;
+  let newUrl = null, newOrig = null;
   try {
-    if (photo && photo.result) newUrl = data.image = await uploadPhoto(photo.result, name);
+    if (photo && photo.result) {
+      newUrl = data.image = await uploadPhoto(photo.result, name);
+      // Keep the original too (upright), unless all we had was an older gift's edited photo.
+      if (sourceKind !== "saved" && photo.original && !(sourceKind === "original" && rotation === 0)) {
+        newOrig = data.original_image = await uploadPhoto(await originalForStorage(photo.original), name + "-original");
+      }
+    }
     const q = editing ? sb.from("gifts").update(data).eq("id", editing.id) : sb.from("gifts").insert(data);
     const { error } = await q;
     if (error) throw error;
     if (editing && newUrl && editing.image !== newUrl) await deletePhoto(editing.image);
+    if (editing && newOrig && editing.original_image && editing.original_image !== newOrig) await deletePhoto(editing.original_image);
     $("editor").close();
     toast(editing ? "Saved! The shop is updated." : `${name} is now in the shop 🦆`);
     loadGifts();
   } catch (ex) {
     if (newUrl) await deletePhoto(newUrl);
+    if (newOrig) await deletePhoto(newOrig);
     err.textContent = friendly(ex);
   } finally {
     save.disabled = false; save.textContent = editing ? "Save changes" : "Publish";

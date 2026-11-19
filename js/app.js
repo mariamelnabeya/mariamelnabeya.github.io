@@ -9,10 +9,16 @@ function loadCart() {
 function saveCart() {
   try { localStorage.setItem(KEY, JSON.stringify(cart)); } catch {}
 }
+// Short message at the bottom. Disappears after 5 seconds (or when tapped).
+// A new message restarts the 5 seconds instead of stacking timers.
+const TOAST_MS = 5000;
+let toastTimer = 0;
 function toast(msg) {
   const t = $("toast"); t.textContent = msg; t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 1800);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), TOAST_MS);
 }
+$("toast").addEventListener("click", () => { clearTimeout(toastTimer); $("toast").classList.remove("show"); });
 
 // Gifts come from Supabase (kept up to date from the admin page).
 // If Supabase can't be reached, the shop shows the starter list in gifts.json.

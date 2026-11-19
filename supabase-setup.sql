@@ -18,6 +18,9 @@ create table if not exists public.gifts (
   updated_at  timestamptz not null default now()
 );
 
+-- The original photo kept with each gift (so it can be re-edited or used as it is later).
+alter table public.gifts add column if not exists original_image text;
+
 create or replace function public.touch_updated_at() returns trigger
 language plpgsql set search_path = '' as $$
 begin new.updated_at := now(); return new; end $$;
