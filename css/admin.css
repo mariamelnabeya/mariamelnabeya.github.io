@@ -96,3 +96,6 @@ textarea{font:inherit;padding:11px 14px;border:2px solid var(--line);border-radi
 .pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.8rem;font-weight:700;background:#FFF0B3}
 .pill.done{background:var(--mint)}
 .pill.cancelled{background:var(--pink)}
+.ref{font:700 .9rem ui-monospace,Consolas,monospace;background:var(--butter);border-radius:8px;padding:2px 8px;letter-spacing:.03em}
+.req.is-stale{opacity:.7;border-style:dashed;border-color:var(--line)}
+.pill.stale{background:#EEE7F3;color:var(--soft)}

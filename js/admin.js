@@ -600,18 +600,22 @@ function renderRequests() {
   const list = requests.filter(r => f === "all" || r.status === f);
   const box = $("reqList"); box.innerHTML = "";
   if (!list.length) {
-    box.innerHTML = `<p class="muted">${f === "new" ? "No new requests. When a girl sends a request on WhatsApp and taps “Yes, I sent it”, it appears here." : "Nothing here yet."}</p>`;
+    box.innerHTML = `<p class="muted">${f === "new" ? "No new requests. When a girl taps “Open WhatsApp” in the shop, her request appears here." : "Nothing here yet."}</p>`;
     return;
   }
   const when = d => new Date(d).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   list.forEach(r => {
-    const el = document.createElement("article"); el.className = "req is-" + r.status;
+    // A request still "New" after 3 days was probably never sent on WhatsApp.
+    const stale = r.status === "new" && Date.now() - new Date(r.created_at) > 3 * 24 * 3600 * 1000;
+    const el = document.createElement("article"); el.className = "req is-" + r.status + (stale ? " is-stale" : "");
     const head = document.createElement("div"); head.className = "req-head";
     const who = document.createElement("b"); who.textContent = r.name;
-    const meta = document.createElement("small"); meta.textContent = `${r.ref} · ${when(r.created_at)}`;
-    const pill = document.createElement("span"); pill.className = "pill " + r.status;
-    pill.textContent = { new: "New", done: "Done", cancelled: "Cancelled" }[r.status];
-    head.append(who, meta, pill);
+    const refEl = document.createElement("span"); refEl.className = "ref"; refEl.textContent = r.ref;
+    refEl.title = "Search this order number in WhatsApp to find her message";
+    const meta = document.createElement("small"); meta.textContent = when(r.created_at);
+    const pill = document.createElement("span"); pill.className = "pill " + (stale ? "stale" : r.status);
+    pill.textContent = stale ? "Probably not sent?" : { new: "New", done: "Done", cancelled: "Cancelled" }[r.status];
+    head.append(who, refEl, meta, pill);
     const ul = document.createElement("ul");
     (r.items || []).forEach(it => { const li = document.createElement("li"); li.textContent = `${it.name} × ${it.qty} = ${it.qty * it.points} Ducks`; ul.appendChild(li); });
     const tot = document.createElement("div"); tot.className = "req-total"; tot.textContent = `${r.total_gifts} gift${r.total_gifts === 1 ? "" : "s"} · ${r.total_points} Ducks`;
