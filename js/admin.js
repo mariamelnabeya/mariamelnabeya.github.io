@@ -46,6 +46,7 @@ async function start() {
   if (!isAdmin) { show("notAdminView"); return; }
   show("mainView");
   await loadGifts();
+  refreshNewBadge();
 }
 
 $("loginForm").addEventListener("submit", async e => {
@@ -348,9 +349,14 @@ async function preparePhoto() {
     if (!cache[kind]) {
       previewBlob(cache.source);
       status(enhance ? "Working on the photo…" : "Preparing the original photo…");
-      const result = enhance ? await studioPhoto(cache.source, status) : await plainPhoto(cache.source);
+      // Reuse a version that is already being made (for example after switching Edited → Original → Edited).
+      const mine = cache;
+      const key = kind + "Job";
+      mine[key] = mine[key] || (enhance ? studioPhoto(mine.source, status) : plainPhoto(mine.source))
+        .then(r => { mine[kind] = r; return r; })
+        .catch(e => { mine[key] = null; throw e; });
+      const result = await mine[key];
       if (job !== photoJob) return;
-      cache[kind] = result;
       photo.result = result;
     }
     previewBlob(photo.result);
@@ -557,6 +563,82 @@ function revFinish(msg) {
   revShow("revDone");
   $("revSummary").textContent = msg || `Finished! ${rev.used} new photo${rev.used === 1 ? "" : "s"} saved, ${rev.kept} kept as before.` +
     (rev.failed && rev.failed.length ? ` These didn't work and kept their old photo: ${rev.failed.join(", ")}.` : "");
+}
+
+// ---------- requests (confirmed sent on WhatsApp) ----------
+let requests = [];
+function showTab(which) {
+  const req = which === "requests";
+  $("requestsView").hidden = !req; $("giftsView").hidden = req;
+  $("tabGifts").classList.toggle("on", !req); $("tabRequests").classList.toggle("on", req);
+  $("tabGifts").setAttribute("aria-selected", String(!req)); $("tabRequests").setAttribute("aria-selected", String(req));
+  if (req) loadRequests();
+}
+$("tabGifts").onclick = () => showTab("gifts");
+$("tabRequests").onclick = () => showTab("requests");
+$("reqFilter").addEventListener("change", renderRequests);
+$("reqRefresh").onclick = () => loadRequests();
+
+async function loadRequests() {
+  const { data, error } = await sb.from("requests").select("*").order("created_at", { ascending: false }).limit(300);
+  if (error) { toast(friendly(error), 4000); return; }
+  requests = data;
+  renderRequests();
+}
+function updateNewBadge() {
+  const n = requests.filter(r => r.status === "new").length;
+  $("newCount").textContent = n; $("newCount").hidden = !n;
+}
+async function refreshNewBadge() {
+  const { count } = await sb.from("requests").select("id", { count: "exact", head: true }).eq("status", "new");
+  $("newCount").textContent = count || 0; $("newCount").hidden = !count;
+}
+
+function renderRequests() {
+  updateNewBadge();
+  const f = $("reqFilter").value;
+  const list = requests.filter(r => f === "all" || r.status === f);
+  const box = $("reqList"); box.innerHTML = "";
+  if (!list.length) {
+    box.innerHTML = `<p class="muted">${f === "new" ? "No new requests. When a girl sends a request on WhatsApp and taps “Yes, I sent it”, it appears here." : "Nothing here yet."}</p>`;
+    return;
+  }
+  const when = d => new Date(d).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  list.forEach(r => {
+    const el = document.createElement("article"); el.className = "req is-" + r.status;
+    const head = document.createElement("div"); head.className = "req-head";
+    const who = document.createElement("b"); who.textContent = r.name;
+    const meta = document.createElement("small"); meta.textContent = `${r.ref} · ${when(r.created_at)}`;
+    const pill = document.createElement("span"); pill.className = "pill " + r.status;
+    pill.textContent = { new: "New", done: "Done", cancelled: "Cancelled" }[r.status];
+    head.append(who, meta, pill);
+    const ul = document.createElement("ul");
+    (r.items || []).forEach(it => { const li = document.createElement("li"); li.textContent = `${it.name} × ${it.qty} = ${it.qty * it.points} Ducks`; ul.appendChild(li); });
+    const tot = document.createElement("div"); tot.className = "req-total"; tot.textContent = `${r.total_gifts} gift${r.total_gifts === 1 ? "" : "s"} · ${r.total_points} Ducks`;
+    const act = document.createElement("div"); act.className = "req-actions";
+    if (r.status === "new") {
+      act.append(btn("✅ Done (lower stock)", "primary", () => reqAction(r, "done")), btn("Cancel", "ghost", () => reqAction(r, "cancel")));
+    } else {
+      act.append(btn(r.status === "done" ? "↩ Undo (put stock back)" : "↩ Make it new again", "ghost", () => reqAction(r, "reopen")));
+      if (r.status === "cancelled") act.append(btn("🗑 Delete", "danger", () => reqAction(r, "delete")));
+    }
+    el.append(head, ul, tot, act);
+    box.appendChild(el);
+  });
+}
+
+async function reqAction(r, what) {
+  let error;
+  if (what === "done") ({ error } = await sb.rpc("complete_request", { p_id: r.id }));
+  else if (what === "reopen") ({ error } = await sb.rpc("reopen_request", { p_id: r.id }));
+  else if (what === "delete") {
+    if (!confirm(`Delete ${r.name}'s cancelled request ${r.ref}? This cannot be undone.`)) return;
+    ({ error } = await sb.from("requests").delete().eq("id", r.id));
+  }
+  else ({ error } = await sb.from("requests").update({ status: "cancelled" }).eq("id", r.id));
+  if (error) { toast(friendly(error), 4000); return; }
+  toast({ done: `Done! Stock lowered for ${r.name}'s gifts.`, reopen: "Moved back to New.", delete: "Request deleted." }[what] || "Request cancelled (stock not changed).");
+  await Promise.all([loadRequests(), loadGifts()]);
 }
 
 // ---------- backup ----------

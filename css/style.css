@@ -133,3 +133,10 @@ body.has-fab .xmas{padding-bottom:100px}
 /* ---- Pop-up message: fully hidden when not showing (also when it sits above the cart button) ---- */
 .toast{opacity:0;visibility:hidden;pointer-events:none;cursor:pointer;max-width:calc(100vw - 120px);text-align:center;transition:transform .2s,opacity .2s,visibility .2s}
 .toast.show{opacity:1;visibility:visible;pointer-events:auto}
+
+/* ---- "Did you send it?" ---- */
+.sent-dialog{text-align:center;width:min(400px,92%)}
+.sent-dialog h2{font-size:1.35rem;margin-bottom:6px}
+.sent-dialog p{margin:6px 0;color:var(--soft)}
+.sent-btns{display:grid;gap:8px;margin-top:12px}
+.sent-btns button{padding:12px 16px;font-size:1rem}

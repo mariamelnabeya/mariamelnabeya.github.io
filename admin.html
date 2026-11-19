@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="icon" href="assets/duck.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css?v=20261119c">
-<link rel="stylesheet" href="css/admin.css?v=20261119c">
+<link rel="stylesheet" href="css/style.css?v=20261119e">
+<link rel="stylesheet" href="css/admin.css?v=20261119e">
 </head>
 <body class="admin">
 <header class="admin-top">
@@ -43,6 +43,26 @@
 
   <!-- Main admin view -->
   <section id="mainView" hidden>
+    <div class="tabs" role="tablist" aria-label="Admin sections">
+      <button type="button" role="tab" id="tabGifts" class="tab on" aria-selected="true">🎁 Gifts</button>
+      <button type="button" role="tab" id="tabRequests" class="tab" aria-selected="false">📋 Requests <span id="newCount" class="badge" hidden>0</span></button>
+    </div>
+
+    <div id="requestsView" hidden>
+      <div class="admin-tools">
+        <select id="reqFilter" aria-label="Show requests">
+          <option value="new">New requests</option>
+          <option value="done">Done</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="all">All requests</option>
+        </select>
+        <button type="button" id="reqRefresh" class="ghost">↻ Refresh</button>
+        <p class="muted small">Only requests the girls confirmed they sent on WhatsApp appear here. Check WhatsApp (#DuckShop), then press <b>Done</b>: it lowers the stock for you.</p>
+      </div>
+      <div id="reqList" class="req-list"></div>
+    </div>
+
+    <div id="giftsView">
     <div id="importBox" class="panel import" hidden>
       <h2>Your shop is empty</h2>
       <p>Copy your 24 starter gifts (with their photos) into the online shop. You only need to do this once.</p>
@@ -56,6 +76,7 @@
       <p id="adminCount" class="muted"></p>
     </div>
     <div id="giftList" class="gift-list"></div>
+    </div>
   </section>
 
   <p id="loading" class="muted center">Loading…</p>
@@ -151,7 +172,7 @@
 </dialog>
 
 <div id="toast" class="toast" role="status"></div>
-<script src="js/config.js?v=20261119c"></script>
-<script type="module" src="js/admin.js?v=20261119c"></script>
+<script src="js/config.js?v=20261119e"></script>
+<script type="module" src="js/admin.js?v=20261119e"></script>
 </body>
 </html>

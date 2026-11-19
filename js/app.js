@@ -162,20 +162,74 @@ function makeRef() {
   for (let i = 0; i < 6; i++) r += chars[Math.floor(Math.random() * chars.length)];
   return CONFIG.refPrefix + r;
 }
-function buildMessage(name) {
+function buildMessage(name, ref) {
   const lines = cartLines();
   const n = lines.reduce((s, l) => s + l.qty, 0), pts = lines.reduce((s, l) => s + l.qty * l.g.points, 0);
-  return [`🦆 ${CONFIG.hashtag}`, `Order ref: ${makeRef()}`, `Name: ${name}`, "", "Gifts:",
+  return [`🦆 ${CONFIG.hashtag}`, `Order ref: ${ref}`, `Name: ${name}`, "", "Gifts:",
     ...lines.map(l => `• ${l.g.name} x${l.qty} = ${l.qty * l.g.points} Ducks`), "",
     `Total gifts: ${n}`, `Total Ducks: ${pts}`].join("\n");
 }
+
+// ---- "Did you send it?" ----
+// The website can't see inside WhatsApp. So when the girl comes back from WhatsApp,
+// we ask her. Only "Yes, I sent it" saves the request to the owner's Requests list.
+const PENDING_KEY = "duckshop-pending";
+let pending = null, askedAt = 0;
+function loadPending() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY));
+    if (p && Date.now() - p.at < 24 * 3600 * 1000) return p;
+  } catch {}
+  return null;
+}
+function savePending(p) { pending = p; try { p ? localStorage.setItem(PENDING_KEY, JSON.stringify(p)) : localStorage.removeItem(PENDING_KEY); } catch {} }
+
+function askIfSent() {
+  if (!pending || $("sentDialog").open || Date.now() - pending.at < 1500 || Date.now() - askedAt < 1500) return;
+  askedAt = Date.now();
+  $("sentRef").textContent = pending.ref;
+  $("sentError").textContent = "";
+  $("sentDialog").showModal();
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") askIfSent(); });
+window.addEventListener("focus", askIfSent);
+window.addEventListener("pageshow", askIfSent);
+
+$("sentYes").onclick = async () => {
+  const b = $("sentYes"); b.disabled = true; b.textContent = "Saving…";
+  try {
+    if (CONFIG.supabaseUrl && CONFIG.supabaseKey) {
+      const res = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/submit_request`, {
+        method: "POST",
+        headers: { apikey: CONFIG.supabaseKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_ref: pending.ref, p_name: pending.name, p_items: pending.items })
+      });
+      if (!res.ok) { let m = ""; try { m = (await res.json()).message; } catch {} throw new Error(m || "Could not save"); }
+    }
+    savePending(null);
+    cart = {}; saveCart(); renderCart(); openCart(false);
+    $("sentDialog").close();
+    toast("Thank you! Your request is saved 🦆");
+  } catch (e) {
+    $("sentError").textContent = "Sorry, it couldn't be saved (" + e.message + "). Check your internet and tap “Yes” again.";
+  } finally { b.disabled = false; b.textContent = "Yes, I sent it"; }
+};
+$("sentNo").onclick = () => {
+  savePending(null);
+  $("sentDialog").close();
+  toast("No problem. Your cart is still here. Tap Submit My Request when you're ready.");
+};
+
 $("nameForm").addEventListener("submit", e => {
   e.preventDefault();
   const name = $("nameInput").value.trim().replace(/\s+/g, " ");
   if (name.length < 2) { $("nameError").textContent = "Please enter your name (at least 2 letters)."; return; }
-  const url = `https://wa.me/${CONFIG.whatsappNumber}?text=${encodeURIComponent(buildMessage(name))}`;
+  const ref = makeRef();
+  const url = `https://wa.me/${CONFIG.whatsappNumber}?text=${encodeURIComponent(buildMessage(name, ref))}`;
+  savePending({ ref, name, items: cartLines().map(l => ({ id: l.g.id, qty: l.qty })), at: Date.now() });
   window.open(url, "_blank", "noopener");
   $("nameDialog").close();
-  toast("WhatsApp opened. Press send there to finish.");
+  toast("WhatsApp opened. Press Send there, then come back here.");
 });
-init();
+pending = loadPending();
+init().then(() => { if (pending) { pending.at = Math.min(pending.at, Date.now() - 2000); askIfSent(); } });
