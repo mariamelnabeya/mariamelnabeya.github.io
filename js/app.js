@@ -71,7 +71,7 @@ function renderGrid() {
   list.forEach(g => {
     const card = document.createElement("article"); card.className = "card";
     const thumb = document.createElement("div"); thumb.className = "thumb";
-    const img = new Image(); img.alt = g.name; img.loading = "lazy";
+    const img = new Image(); img.alt = g.name; img.loading = "lazy"; img.decoding = "async";
     img.onerror = () => { img.onerror = null; img.src = "assets/duck.svg"; img.classList.add("ph"); };
     img.src = g.image || "missing";
     thumb.appendChild(img);

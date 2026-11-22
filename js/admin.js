@@ -2,6 +2,8 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm";
 
 const BG_REMOVAL = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm";
+const BG_MODEL = "isnet_quint8";         // the lighter version of the tool: half the download and memory, faster on phones
+const ASSET_VERSION = new URL(import.meta.url).searchParams.get("v") || "1";
 const OUT_W = 1200, OUT_H = 900;         // size of saved photos (4:3, like the shop cards; sharp on phones)
 const MAX_ENLARGE = 1.5;                 // never stretch a photo more than this (more = blurry)
 const ENHANCE_KEY = "duckshop-admin-enhance";
@@ -91,7 +93,7 @@ $("adminSearch").addEventListener("input", renderList);
 function row(g) {
   const r = document.createElement("article");
   r.className = "g-row" + (g.hidden ? " is-hidden" : "") + (g.stock < 1 ? " is-out" : "");
-  const img = new Image(); img.alt = ""; img.loading = "lazy"; img.src = imgSrc(g);
+  const img = new Image(); img.alt = ""; img.loading = "lazy"; img.decoding = "async"; img.src = imgSrc(g);
   img.onerror = () => { img.onerror = null; img.src = "assets/duck.svg"; };
 
   const info = document.createElement("div"); info.className = "g-info";
@@ -202,7 +204,44 @@ async function plainPhoto(file) {
   return canvasToJpeg(c, 0.9);
 }
 
-let bgLib = null;
+// ---- The background-removal tool runs in the background (a Web Worker) ----
+// so the page never freezes while a photo is edited. If this browser can't run it
+// in the background, it falls back to running it on the page (slower, may freeze).
+let photoWorker = null, workerBroken = false, workerSeq = 0, bgLib = null;
+const workerJobs = new Map();
+function getWorker() {
+  if (photoWorker || workerBroken) return photoWorker;
+  try {
+    photoWorker = new Worker(new URL("photo-worker.js?v=" + ASSET_VERSION, import.meta.url), { type: "module" });
+    photoWorker.onmessage = e => {
+      const job = workerJobs.get(e.data.id); if (!job) return;
+      if (e.data.progress) { job.onProgress(e.data.progress); return; }
+      workerJobs.delete(e.data.id);
+      e.data.error ? job.reject(new Error(e.data.error)) : job.resolve(e.data.result);
+    };
+    photoWorker.onerror = () => {
+      workerBroken = true; photoWorker = null;
+      for (const job of workerJobs.values()) job.reject(new Error("WORKER_FAILED"));
+      workerJobs.clear();
+    };
+  } catch { workerBroken = true; photoWorker = null; }
+  return photoWorker;
+}
+async function removeBg(blob, onProgress) {
+  const w = getWorker();
+  if (w) {
+    try {
+      return await new Promise((resolve, reject) => {
+        const id = ++workerSeq; workerJobs.set(id, { resolve, reject, onProgress });
+        w.postMessage({ id, blob, model: BG_MODEL });
+      });
+    } catch (e) { if (e.message !== "WORKER_FAILED") throw e; }
+  }
+  bgLib = bgLib || await import(BG_REMOVAL);
+  return bgLib.removeBackground(blob, { model: BG_MODEL, output: { format: "image/png" },
+    progress: (key, current, total) => onProgress({ key, cur: current, total }) });
+}
+
 async function studioPhoto(file, onStatus) {
   // 1) shrink very big phone photos (max 2000px) so it runs faster but stays sharp
   const bmp = await bitmapOf(file);
@@ -212,21 +251,18 @@ async function studioPhoto(file, onStatus) {
   // The tool looks at a copy with stronger contrast and colors, so pale parts of a gift
   // (a white card, a clear bag) stand out from the background and are not erased.
   // The gift itself keeps its real, untouched colors: only the shape is taken from the copy.
-  const guide = document.createElement("canvas"); guide.width = pre.width; guide.height = pre.height;
-  const gx = guide.getContext("2d"); gx.filter = "contrast(1.9) saturate(3) brightness(0.95)"; gx.drawImage(pre, 0, 0);
-  const small = await new Promise(r => guide.toBlob(r, "image/png"));
+  // The copy is at most 1280px: the tool works at about 1000px anyway, so bigger only costs time.
+  const gs = Math.min(1, 1280 / Math.max(pre.width, pre.height));
+  const guideSrc = scaledCanvas(pre, 0, 0, pre.width, pre.height, pre.width * gs, pre.height * gs);
+  const guide = document.createElement("canvas"); guide.width = guideSrc.width; guide.height = guideSrc.height;
+  const gx = guide.getContext("2d"); gx.filter = "contrast(1.9) saturate(3) brightness(0.95)"; gx.drawImage(guideSrc, 0, 0);
+  const small = await new Promise(r => guide.toBlob(r, "image/jpeg", 0.92));   // JPEG: much faster than PNG, same shape result
 
-  // 2) remove the background (runs in this browser; first time downloads the tool, ~40 MB)
-  onStatus("Getting the photo tool ready… (the first time can take up to a minute)");
-  bgLib = bgLib || await import(BG_REMOVAL);
-  onStatus("Removing the background…");
-  const shapeBlob = await bgLib.removeBackground(small, {
-    model: "isnet_fp16",
-    output: { format: "image/png" },
-    progress: (key, cur, total) => {
-      if (key.startsWith("fetch") && total && cur < total) onStatus(`Getting the photo tool ready… ${Math.round(cur / total * 100)}%`);
-      else onStatus("Removing the background… (about 10 to 30 seconds)");
-    }
+  // 2) remove the background (the first time on a device, the tool is downloaded once)
+  onStatus("Getting the photo tool ready… (the first time can take a minute)");
+  const shapeBlob = await removeBg(small, ({ key, cur, total }) => {
+    if (String(key).startsWith("fetch") && total && cur < total) onStatus(`Getting the photo tool ready… ${Math.round(cur / total * 100)}%`);
+    else onStatus("Removing the background… (you can keep typing the name and price)");
   });
   const shape = await bitmapOf(shapeBlob);
 
@@ -257,9 +293,13 @@ async function studioPhoto(file, onStatus) {
   //    Tall products (or rotated photos) fit by height, wide ones by width; never stretched more than 1.5x.
   const k = Math.min((OUT_W * 0.8) / bw, (OUT_H * 0.78) / bh, MAX_ENLARGE);
   const dw = bw * k, dh = bh * k, dx = Math.round((OUT_W - dw) / 2), dy = Math.round(OUT_H * 0.9 - dh);
+  // soft shadow under the gift: a fading oval (a gradient is much lighter for phones than a blur filter)
+  const rx = dw * 0.46, ry = Math.max(12, dh * 0.06), sy = dy + dh - 2;
   x.save();
-  x.filter = "blur(18px)"; x.fillStyle = "rgba(120,80,10,.22)";
-  x.beginPath(); x.ellipse(OUT_W / 2, dy + dh - 2, dw * 0.42, Math.max(10, dh * 0.045), 0, 0, Math.PI * 2); x.fill();
+  x.translate(OUT_W / 2, sy); x.scale(1, ry / rx);
+  const sh = x.createRadialGradient(0, 0, 0, 0, 0, rx);
+  sh.addColorStop(0, "rgba(120,80,10,.26)"); sh.addColorStop(0.6, "rgba(120,80,10,.12)"); sh.addColorStop(1, "rgba(120,80,10,0)");
+  x.fillStyle = sh; x.beginPath(); x.arc(0, 0, rx, 0, Math.PI * 2); x.fill();
   x.restore();
   x.drawImage(scaledCanvas(cut, x0, y0, bw, bh, dw, dh), dx, dy);
   return canvasToJpeg(c, 0.9);
@@ -658,6 +698,8 @@ $("backupBtn").onclick = () => {
 
 // Keep the photo tool on this device after the first download.
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("photo-tool-cache.js").catch(() => {});
+// Ask the browser to keep the saved photo tool, so it is not cleared and downloaded again.
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") show("loginView"); });
 start().catch(err => { show("loginView"); $("loginError").textContent = friendly(err); });
