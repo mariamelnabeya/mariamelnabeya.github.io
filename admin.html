@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="icon" href="assets/duck.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css?v=20261122b">
-<link rel="stylesheet" href="css/admin.css?v=20261122b">
+<link rel="stylesheet" href="css/style.css?v=20261122d">
+<link rel="stylesheet" href="css/admin.css?v=20261122d">
 </head>
 <body class="admin">
 <header class="admin-top">
@@ -106,6 +106,7 @@
         <div class="rotate" id="rotateRow" hidden>
           <button type="button" id="rotLeft" class="ghost" aria-label="Rotate left">↺ Rotate left</button>
           <button type="button" id="rotRight" class="ghost" aria-label="Rotate right">↻ Rotate right</button>
+          <button type="button" id="cropBtn" class="ghost" aria-label="Crop the photo">✂️ Crop</button>
         </div>
         <div class="seg" id="viewSeg" role="group" aria-label="Which photo to save" hidden>
           <span class="seg-label">Save:</span>
@@ -171,8 +172,19 @@
   </div>
 </dialog>
 
+<!-- Crop the photo -->
+<dialog id="cropDialog" class="editor crop-dialog" aria-labelledby="cropTitle">
+  <div class="editor-head"><h2 id="cropTitle">Crop the photo</h2><button type="button" id="cropClose" class="x" aria-label="Close">✕</button></div>
+  <p class="muted small">Drag the box to move it. Drag a corner to make it bigger or smaller. The part inside the box fills the whole photo in the shop.</p>
+  <div class="crop-stage" id="cropStage">
+    <img id="cropImg" alt="Photo to crop" draggable="false">
+    <div id="cropBox" class="crop-box"><span class="h" data-c="nw"></span><span class="h" data-c="ne"></span><span class="h" data-c="sw"></span><span class="h" data-c="se"></span></div>
+  </div>
+  <div class="row crop-row"><button type="button" id="cropWhole" class="ghost">Use whole photo</button><button type="button" id="cropCancel" class="ghost">Cancel</button><button type="button" id="cropApply" class="primary">Use this crop</button></div>
+</dialog>
+
 <div id="toast" class="toast" role="status"></div>
-<script src="js/config.js?v=20261122b"></script>
-<script type="module" src="js/admin.js?v=20261122b"></script>
+<script src="js/config.js?v=20261122d"></script>
+<script type="module" src="js/admin.js?v=20261122d"></script>
 </body>
 </html>

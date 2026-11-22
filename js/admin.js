@@ -322,6 +322,18 @@ function previewUrl(url) {
 
 let chosenFile = null;   // last photo taken with the camera or picked from the gallery
 let rotation = 0;        // 0, 90, 180 or 270 degrees (clockwise)
+let crop = null;         // part of the (rotated) photo to keep: { x, y, w, h } as fractions 0..1, or null = whole photo
+const CROP_RATIO = 4 / 3; // same shape as the shop's photo frame, so the cropped part fills it completely
+
+// Keep only the cropped part of the photo (full quality).
+async function cropBlob(blob, c) {
+  const bmp = await bitmapOf(blob);
+  const sx = Math.round(c.x * bmp.width), sy = Math.round(c.y * bmp.height);
+  const sw = Math.max(1, Math.round(c.w * bmp.width)), sh = Math.max(1, Math.round(c.h * bmp.height));
+  const cv = document.createElement("canvas"); cv.width = sw; cv.height = sh;
+  cv.getContext("2d").drawImage(bmp, sx, sy, sw, sh, 0, 0, sw, sh);
+  return canvasToJpeg(cv, 0.95);
+}
 
 // Turn the photo a quarter (or half) turn. A quarter turn swaps width and height exactly,
 // so nothing is cut or squeezed. Saved as PNG so no quality is lost before editing.
@@ -363,11 +375,78 @@ async function ensureSource() {
 async function rotate(step) {
   if (!(await ensureSource())) return;
   rotation = (rotation + step + 360) % 360;
+  crop = null;   // a turned photo has a different shape, so start the crop again
   srcGen++;
   preparePhoto();
 }
 $("rotLeft").onclick = () => rotate(-90);
 $("rotRight").onclick = () => rotate(90);
+
+// ---------- crop ----------
+// A 4:3 box over the photo: drag inside to move it, drag a corner to resize it.
+let cropBoxPx = null, cropImgUrl = null;           // box in screen pixels while the crop window is open
+function defaultCrop(iw, ih) {                     // biggest 4:3 box, in the middle
+  let w = iw, h = w / CROP_RATIO;
+  if (h > ih) { h = ih; w = h * CROP_RATIO; }
+  return { x: (iw - w) / 2, y: (ih - h) / 2, w, h };
+}
+function drawCropBox() {
+  const b = $("cropBox"), c = cropBoxPx;
+  b.style.left = c.x + "px"; b.style.top = c.y + "px"; b.style.width = c.w + "px"; b.style.height = c.h + "px";
+}
+async function openCrop() {
+  if (!(await ensureSource())) return;
+  $("photoStatus").textContent = "Opening the photo…";
+  const full = rotation ? await rotateBlob(chosenFile, rotation) : chosenFile;
+  if (cropImgUrl) URL.revokeObjectURL(cropImgUrl);
+  cropImgUrl = URL.createObjectURL(full);
+  const img = $("cropImg");
+  img.onload = () => {
+    const iw = img.clientWidth, ih = img.clientHeight;
+    cropBoxPx = crop ? { x: crop.x * iw, y: crop.y * ih, w: crop.w * iw, h: crop.h * ih } : defaultCrop(iw, ih);
+    drawCropBox();
+  };
+  img.src = cropImgUrl;
+  $("photoStatus").textContent = "";
+  $("cropDialog").showModal();
+}
+$("cropBtn").onclick = openCrop;
+$("cropClose").onclick = $("cropCancel").onclick = () => $("cropDialog").close();
+$("cropWhole").onclick = () => { crop = null; srcGen++; $("cropDialog").close(); preparePhoto(); };
+$("cropApply").onclick = () => {
+  const img = $("cropImg"), iw = img.clientWidth, ih = img.clientHeight, c = cropBoxPx;
+  crop = { x: c.x / iw, y: c.y / ih, w: c.w / iw, h: c.h / ih };
+  srcGen++; $("cropDialog").close(); preparePhoto();
+};
+
+(() => {
+  const box = $("cropBox"); let drag = null;
+  box.addEventListener("pointerdown", e => {
+    e.preventDefault(); box.setPointerCapture(e.pointerId);
+    const corner = e.target.dataset && e.target.dataset.c;
+    drag = { corner, sx: e.clientX, sy: e.clientY, start: { ...cropBoxPx } };
+  });
+  box.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const img = $("cropImg"), iw = img.clientWidth, ih = img.clientHeight;
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy, s = drag.start;
+    if (!drag.corner) {                            // move the whole box, keep it on the photo
+      cropBoxPx = { ...s, x: Math.min(Math.max(0, s.x + dx), iw - s.w), y: Math.min(Math.max(0, s.y + dy), ih - s.h) };
+    } else {                                       // resize from a corner, the opposite corner stays still
+      const left = drag.corner.includes("w"), top = drag.corner.includes("n");
+      const ax = left ? s.x + s.w : s.x, ay = top ? s.y + s.h : s.y;          // fixed corner
+      let w = Math.max(40, (left ? -dx : dx) + s.w);
+      w = Math.min(w, left ? ax : iw - ax);                                    // stay inside, left/right
+      let h = w / CROP_RATIO;
+      const roomY = top ? ay : ih - ay;                                        // stay inside, top/bottom
+      if (h > roomY) { h = roomY; w = h * CROP_RATIO; }
+      cropBoxPx = { x: left ? ax - w : ax, y: top ? ay - h : ay, w, h };
+    }
+    drawCropBox();
+  });
+  const end = () => { drag = null; };
+  box.addEventListener("pointerup", end); box.addEventListener("pointercancel", end);
+})();
 
 // Makes the photo that will be SAVED: the edited one ("Edited") or the original one ("Original"),
 // following the "Make the photo pretty" switch. Both versions are remembered,
@@ -383,9 +462,10 @@ async function preparePhoto() {
   try {
     if (cache.gen !== srcGen) {
       const gen = srcGen;
-      const source = rotation ? await rotateBlob(chosenFile, rotation) : chosenFile;
+      const full = rotation ? await rotateBlob(chosenFile, rotation) : chosenFile;   // upright, whole photo
+      const source = crop ? await cropBlob(full, crop) : full;                     // what gets edited
       if (job !== photoJob) return;
-      cache = { gen, source, studio: null, plain: null };
+      cache = { gen, full, source, studio: null, plain: null };
     }
     const kind = enhance ? "studio" : "plain";
     photo = { original: cache.source, result: cache[kind] };
@@ -417,7 +497,7 @@ async function preparePhoto() {
 }
 ["photoInput", "cameraInput"].forEach(id => $(id).addEventListener("change", e => {
   const f = e.target.files[0]; e.target.value = "";
-  if (f) { chosenFile = f; sourceKind = "new"; rotation = 0; srcGen++; $("rotateRow").hidden = false; preparePhoto(); }
+  if (f) { chosenFile = f; sourceKind = "new"; rotation = 0; crop = null; srcGen++; $("rotateRow").hidden = false; preparePhoto(); }
 }));
 async function chooseVersion(enhance) {
   $("enhanceToggle").checked = enhance;
@@ -440,7 +520,7 @@ async function originalForStorage(blob) {
 
 // ---------- add / edit ----------
 function openEditor(g = null) {
-  editing = g; photo = null; chosenFile = null; rotation = 0; photoJob++;
+  editing = g; photo = null; chosenFile = null; rotation = 0; crop = null; photoJob++;
   sourceKind = "new"; srcGen++; cache = { gen: -1, source: null, studio: null, plain: null };
   $("rotateRow").hidden = !(g && g.image);
   $("editForm").reset();
@@ -488,7 +568,8 @@ $("editForm").addEventListener("submit", async e => {
       newUrl = data.image = await uploadPhoto(photo.result, name);
       // Keep the original too (upright), unless all we had was an older gift's edited photo.
       if (sourceKind !== "saved" && photo.original && !(sourceKind === "original" && rotation === 0)) {
-        newOrig = data.original_image = await uploadPhoto(await originalForStorage(photo.original), name + "-original");
+        // The kept original is the WHOLE photo (upright, not cropped), so it can be cropped differently later.
+        newOrig = data.original_image = await uploadPhoto(await originalForStorage(cache.full || photo.original), name + "-original");
       }
     }
     const q = editing ? sb.from("gifts").update(data).eq("id", editing.id) : sb.from("gifts").insert(data);
