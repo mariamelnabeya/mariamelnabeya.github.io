@@ -67,7 +67,7 @@ function renderGrid() {
   list.sort(by);
   $("status").textContent = list.length ? `${list.length} gift${list.length === 1 ? "" : "s"}` : "";
   const grid = $("grid"); grid.innerHTML = "";
-  if (!list.length) { grid.innerHTML = '<p class="empty">No gifts match. Try a different word or clear the filters.</p>'; return; }
+  if (!list.length) { grid.innerHTML = gifts.length ? '<p class="empty">No gifts match. Try a different word or clear the filters.</p>' : '<p class="empty">New gifts are coming soon 🦆</p>'; return; }
   list.forEach(g => {
     const card = document.createElement("article"); card.className = "card";
     const thumb = document.createElement("div"); thumb.className = "thumb";
