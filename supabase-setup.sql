@@ -21,6 +21,9 @@ create table if not exists public.gifts (
 -- The original photo kept with each gift (so it can be re-edited or used as it is later).
 alter table public.gifts add column if not exists original_image text;
 
+-- Discount in percent (0 = no discount). Price after discount = points x (100 - discount) / 100, rounded.
+alter table public.gifts add column if not exists discount integer not null default 0 check (discount between 0 and 90);
+
 create or replace function public.touch_updated_at() returns trigger
 language plpgsql set search_path = '' as $$
 begin new.updated_at := now(); return new; end $$;
@@ -138,7 +141,7 @@ create or replace function public.submit_request(p_ref text, p_name text, p_item
 returns text language plpgsql security definer set search_path = '' as $$
 declare
   v_items jsonb := '[]'::jsonb; v_gifts int := 0; v_points int := 0;
-  it jsonb; g record; q int;
+  it jsonb; g record; q int; v_price int;
 begin
   p_name := btrim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g'));
   if char_length(p_name) < 2 or char_length(p_name) > 40 then raise exception 'Please enter your name'; end if;
@@ -152,10 +155,11 @@ begin
   for it in select value from jsonb_array_elements(p_items) loop
     q := least(greatest(coalesce((it->>'qty')::int, 0), 0), 100);
     if q < 1 then continue; end if;
-    select id, name, points into g from public.gifts where id = (it->>'id')::bigint and not hidden;
+    select id, name, points, discount into g from public.gifts where id = (it->>'id')::bigint and not hidden;
     if not found then continue; end if;
-    v_items := v_items || jsonb_build_array(jsonb_build_object('id', g.id, 'name', g.name, 'qty', q, 'points', g.points));
-    v_gifts := v_gifts + q; v_points := v_points + q * g.points;
+    v_price := round(g.points * (100 - g.discount) / 100.0)::int;   -- price after discount
+    v_items := v_items || jsonb_build_array(jsonb_build_object('id', g.id, 'name', g.name, 'qty', q, 'points', v_price, 'was', g.points));
+    v_gifts := v_gifts + q; v_points := v_points + q * v_price;
   end loop;
   if v_gifts = 0 then raise exception 'Your cart is empty'; end if;
   insert into public.requests (ref, name, items, total_gifts, total_points)
@@ -198,6 +202,29 @@ revoke all on function public.complete_request(bigint) from public;
 revoke all on function public.reopen_request(bigint) from public;
 grant execute on function public.complete_request(bigint) to authenticated;
 grant execute on function public.reopen_request(bigint) to authenticated;
+
+-- 7) Shop settings: the message at the bottom of the shop ---------------
+-- One row only. Everyone can read it; only the admin can change it.
+create table if not exists public.settings (
+  id           int primary key default 1 check (id = 1),
+  banner_show  boolean not null default true,
+  banner_title text    not null default 'Wait for our Christmas Collection Soon' check (char_length(banner_title) <= 120),
+  banner_text  text    not null default '❄ 🎄 ❄' check (char_length(banner_text) <= 200),
+  updated_at   timestamptz not null default now()
+);
+insert into public.settings (id) values (1) on conflict (id) do nothing;
+alter table public.settings enable row level security;
+revoke all on public.settings from anon, authenticated;
+grant select on public.settings to anon, authenticated;
+grant update on public.settings to authenticated;
+drop policy if exists "Everyone reads settings" on public.settings;
+create policy "Everyone reads settings" on public.settings for select to anon, authenticated using (true);
+drop policy if exists "Admin edits settings" on public.settings;
+create policy "Admin edits settings" on public.settings
+  for update to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+drop trigger if exists settings_touch on public.settings;
+create trigger settings_touch before update on public.settings
+for each row execute function public.touch_updated_at();
 
 -- =====================================================================
 -- AFTER you create your admin user (Authentication > Users > Add user),

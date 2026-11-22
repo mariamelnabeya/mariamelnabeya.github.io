@@ -41,6 +41,8 @@ function slug(s) {
   return s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "gift";
 }
 function imgSrc(g) { return g.image || "assets/duck.svg"; }
+// Price after discount (same rounding as the database uses for requests).
+function salePrice(points, discount) { return Math.round(points * (100 - (discount || 0)) / 100); }
 
 // ---------- sign in / out ----------
 async function start() {
@@ -86,26 +88,64 @@ function renderList() {
   const list = gifts.filter(g => !q || [g.name, g.category, g.description].join(" ").toLowerCase().includes(q))
     .sort((a, b) => a.name.localeCompare(b.name));
   const out = gifts.filter(g => g.stock < 1).length, hid = gifts.filter(g => g.hidden).length;
-  $("adminCount").textContent = `${gifts.length} gifts · ${out} out of stock · ${hid} hidden`;
+  const sale = gifts.filter(g => g.discount > 0).length;
+  $("adminCount").textContent = `${gifts.length} gifts · ${out} out of stock · ${hid} hidden · ${sale} on discount`;
+  shown = list;
   const box = $("giftList"); box.innerHTML = "";
   if (!list.length && gifts.length) box.innerHTML = '<p class="muted">No gifts match your search.</p>';
   list.forEach(g => box.appendChild(row(g)));
+  updateSelBar();
 }
 $("adminSearch").addEventListener("input", renderList);
 
+// ---------- choose gifts for a discount ----------
+const picked = new Set();   // ids of the ticked gifts
+let shown = [];             // gifts in the list right now (after the search)
+function updateSelBar() {
+  [...picked].forEach(id => { if (!gifts.some(g => g.id === id)) picked.delete(id); });
+  $("selBar").hidden = !picked.size;
+  $("selCount").textContent = `${picked.size} selected`;
+}
+$("selAll").onclick = () => { shown.forEach(g => picked.add(g.id)); renderList(); };
+$("selClear").onclick = () => { picked.clear(); renderList(); };
+$("selApply").onclick = () => {
+  const pct = parseInt($("selPct").value, 10);
+  if (!(pct >= 1 && pct <= 90)) { toast("Type a discount from 1 to 90 %."); $("selPct").focus(); return; }
+  setDiscount(pct);
+};
+$("selRemove").onclick = () => setDiscount(0);
+async function setDiscount(pct) {
+  const ids = [...picked]; if (!ids.length) return;
+  const bar = $("selBar"); bar.querySelectorAll("button").forEach(b => b.disabled = true);
+  const { error } = await sb.from("gifts").update({ discount: pct }).in("id", ids);
+  bar.querySelectorAll("button").forEach(b => b.disabled = false);
+  if (error) { toast(/discount/.test(error.message) ? "The database needs the discount update first." : friendly(error)); return; }
+  gifts.forEach(g => { if (picked.has(g.id)) g.discount = pct; });
+  const n = ids.length; picked.clear(); renderList();
+  toast(pct ? `${pct}% discount on ${n} gift${n === 1 ? "" : "s"} 🏷️ The shop is updated.` : `Discount removed from ${n} gift${n === 1 ? "" : "s"}.`);
+}
+
 function row(g) {
   const r = document.createElement("article");
-  r.className = "g-row" + (g.hidden ? " is-hidden" : "") + (g.stock < 1 ? " is-out" : "");
+  r.className = "g-row" + (g.hidden ? " is-hidden" : "") + (g.stock < 1 ? " is-out" : "") + (picked.has(g.id) ? " is-picked" : "");
   const img = new Image(); img.alt = ""; img.loading = "lazy"; img.decoding = "async"; img.src = imgSrc(g);
   img.onerror = () => { img.onerror = null; img.src = "assets/duck.svg"; };
+  const pick = document.createElement("label"); pick.className = "g-pick"; pick.title = "Tick to choose this gift for a discount";
+  const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = picked.has(g.id);
+  cb.setAttribute("aria-label", `Choose ${g.name} for a discount`);
+  cb.onchange = () => { cb.checked ? picked.add(g.id) : picked.delete(g.id); r.classList.toggle("is-picked", cb.checked); updateSelBar(); };
+  pick.append(cb, img);
 
   const info = document.createElement("div"); info.className = "g-info";
   const b = document.createElement("b"); b.textContent = g.name;
-  const sm = document.createElement("small"); sm.textContent = `${g.category} · ${g.points} Ducks`;
+  const sm = document.createElement("small");
+  if (g.discount > 0) { sm.append(`${g.category} · `); const s = document.createElement("s"); s.textContent = g.points; sm.append(s, ` ${salePrice(g.points, g.discount)} Ducks`); }
+  else sm.textContent = `${g.category} · ${g.points} Ducks`;
   const badges = document.createElement("div"); badges.className = "g-badges";
   const st = document.createElement("span"); st.className = "tag" + (g.stock < 1 ? " out" : "");
   st.textContent = g.stock < 1 ? "Out of stock" : `${g.stock} left`;
   badges.appendChild(st);
+  if (g.discount > 0) { const d = document.createElement("span"); d.className = "tag sale"; d.textContent = `🏷️ ${g.discount}% off`; badges.appendChild(d); }
   if (g.hidden) { const h = document.createElement("span"); h.className = "tag"; h.textContent = "Hidden"; badges.appendChild(h); }
   info.append(b, sm, badges);
 
@@ -121,7 +161,7 @@ function row(g) {
   const del = btn("Delete", "danger", () => removeGift(g));
   act.append(stock, sold, edit, del);
 
-  r.append(img, info, act);
+  r.append(pick, info, act);
   return r;
 }
 function btn(text, cls, onclick) {
@@ -581,10 +621,18 @@ function openEditor(g = null) {
   $("fPoints").value = g ? g.points : "";
   $("fStock").value = g ? g.stock : 1;
   $("fHidden").checked = g ? g.hidden : false;
+  $("fDiscount").value = g ? (g.discount || 0) : 0; discNote();
   if (g && g.image) previewUrl(imgSrc(g)); else previewBlob(null);
   $("editor").showModal();
 }
 $("addBtn").onclick = () => openEditor();
+// Shows the price after discount while typing, e.g. "40 → 32 Ducks".
+function discNote() {
+  const p = parseInt($("fPoints").value, 10), d = parseInt($("fDiscount").value, 10);
+  $("fDiscNote").textContent = p >= 0 && d > 0 && d <= 90 ? `Price in the shop: ${p} → ${salePrice(p, d)} Ducks` : d > 90 ? "The biggest discount is 90%." : "";
+}
+$("fPoints").addEventListener("input", discNote);
+$("fDiscount").addEventListener("input", discNote);
 $("editorClose").onclick = $("editorCancel").onclick = () => { photoJob++; $("editor").close(); };
 
 $("editForm").addEventListener("submit", async e => {
@@ -597,8 +645,10 @@ $("editForm").addEventListener("submit", async e => {
     category: $("fCat").value.trim().replace(/\s+/g, " "),
     points: parseInt($("fPoints").value, 10),
     stock: parseInt($("fStock").value, 10),
-    hidden: $("fHidden").checked
+    hidden: $("fHidden").checked,
+    discount: parseInt($("fDiscount").value, 10) || 0
   };
+  if (!(data.discount >= 0 && data.discount <= 90)) { err.textContent = "The discount must be from 0 to 90 %."; return; }
   if (!name) { err.textContent = "Please type the gift name."; return; }
   if (!data.category) { err.textContent = "Please type a category."; return; }
   if (!(data.points >= 0)) { err.textContent = "Please type the price in Ducks."; return; }
@@ -737,14 +787,44 @@ function revFinish(msg) {
 // ---------- requests (confirmed sent on WhatsApp) ----------
 let requests = [];
 function showTab(which) {
-  const req = which === "requests";
-  $("requestsView").hidden = !req; $("giftsView").hidden = req;
-  $("tabGifts").classList.toggle("on", !req); $("tabRequests").classList.toggle("on", req);
-  $("tabGifts").setAttribute("aria-selected", String(!req)); $("tabRequests").setAttribute("aria-selected", String(req));
-  if (req) loadRequests();
+  const views = { gifts: ["tabGifts", "giftsView"], requests: ["tabRequests", "requestsView"], message: ["tabMessage", "messageView"] };
+  Object.entries(views).forEach(([k, [tab, view]]) => {
+    const on = k === which;
+    $(view).hidden = !on; $(tab).classList.toggle("on", on); $(tab).setAttribute("aria-selected", String(on));
+  });
+  if (which === "requests") loadRequests();
+  if (which === "message") loadMessage();
 }
 $("tabGifts").onclick = () => showTab("gifts");
 $("tabRequests").onclick = () => showTab("requests");
+$("tabMessage").onclick = () => showTab("message");
+
+// ---------- the message at the bottom of the shop ----------
+function previewMessage() {
+  $("msgPrevTitle").textContent = $("msgTitle").value.trim() || "(no big text)";
+  $("msgPrevText").textContent = $("msgText").value.trim();
+  $("msgPreview").classList.toggle("off", !$("msgShow").checked);
+  $("msgHiddenNote").hidden = $("msgShow").checked;
+}
+["msgShow", "msgTitle", "msgText"].forEach(id => $(id).addEventListener("input", previewMessage));
+async function loadMessage() {
+  $("msgError").textContent = "";
+  const { data, error } = await sb.from("settings").select("banner_show,banner_title,banner_text").eq("id", 1).maybeSingle();
+  if (error || !data) { $("msgError").textContent = error ? friendly(error) : "The shop settings are missing in the database."; return; }
+  $("msgShow").checked = data.banner_show; $("msgTitle").value = data.banner_title; $("msgText").value = data.banner_text;
+  previewMessage();
+}
+$("msgForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const row = { banner_show: $("msgShow").checked, banner_title: $("msgTitle").value.trim(), banner_text: $("msgText").value.trim() };
+  if (row.banner_show && !row.banner_title) { $("msgError").textContent = "Please type the big text, or untick “Show this message”."; return; }
+  $("msgError").textContent = "";
+  const b = $("msgSave"); b.disabled = true; b.textContent = "Saving…";
+  const { error } = await sb.from("settings").update(row).eq("id", 1);
+  b.disabled = false; b.textContent = "Save";
+  if (error) { $("msgError").textContent = friendly(error); return; }
+  toast(row.banner_show ? "Saved! The new message is in the shop 📣" : "Saved! The message is now hidden in the shop.");
+});
 $("reqFilter").addEventListener("change", renderRequests);
 $("reqRefresh").onclick = () => loadRequests();
 
@@ -786,7 +866,7 @@ function renderRequests() {
     pill.textContent = stale ? "Probably not sent?" : { new: "New", done: "Done", cancelled: "Cancelled" }[r.status];
     head.append(who, refEl, meta, pill);
     const ul = document.createElement("ul");
-    (r.items || []).forEach(it => { const li = document.createElement("li"); li.textContent = `${it.name} × ${it.qty} = ${it.qty * it.points} Ducks`; ul.appendChild(li); });
+    (r.items || []).forEach(it => { const li = document.createElement("li"); li.textContent = `${it.name} × ${it.qty} = ${it.qty * it.points} Ducks` + (it.was > it.points ? ` (on discount: ${it.points} instead of ${it.was} each)` : ""); ul.appendChild(li); });
     const tot = document.createElement("div"); tot.className = "req-total"; tot.textContent = `${r.total_gifts} gift${r.total_gifts === 1 ? "" : "s"} · ${r.total_points} Ducks`;
     const act = document.createElement("div"); act.className = "req-actions";
     if (r.status === "new") {

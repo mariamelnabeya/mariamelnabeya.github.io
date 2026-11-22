@@ -20,12 +20,40 @@ function toast(msg) {
 }
 $("toast").addEventListener("click", () => { clearTimeout(toastTimer); $("toast").classList.remove("show"); });
 
+// Price after discount ("discount" is a percent, 0 = none). Same rounding as the database.
+function price(g) { return Math.round(g.points * (100 - (g.discount || 0)) / 100); }
+// "40 Ducks", or with a discount: crossed-out 40, then 32 Ducks
+function fillPrice(el, g) {
+  el.textContent = "";
+  if (g.discount > 0) {
+    const s = document.createElement("s"); s.textContent = g.points; s.setAttribute("aria-label", `was ${g.points}`);
+    const now = document.createElement("span"); now.className = "now"; now.textContent = `${price(g)} Ducks`;
+    el.append(s, now);
+  } else el.textContent = `${g.points} Ducks`;
+}
+
+// The message at the bottom of the shop (set from the admin page).
+async function loadBanner() {
+  let b = null;
+  if (CONFIG.supabaseUrl && CONFIG.supabaseKey) {
+    try {
+      const res = await fetch(`${CONFIG.supabaseUrl}/rest/v1/settings?select=banner_show,banner_title,banner_text&id=eq.1`,
+        { headers: { apikey: CONFIG.supabaseKey }, cache: "no-store" });
+      if (res.ok) b = (await res.json())[0] || null;
+    } catch {}
+  }
+  if (b) { $("bannerTitle").textContent = b.banner_title; $("bannerText").textContent = b.banner_text; }
+  const show = b ? b.banner_show && !!b.banner_title : true;   // can't reach the settings: show the default words
+  $("banner").hidden = !show;
+  document.body.classList.toggle("no-banner", !show);
+}
+
 // Gifts come from Supabase (kept up to date from the admin page).
 // If Supabase can't be reached, the shop shows the starter list in gifts.json.
 async function loadGifts() {
   if (CONFIG.supabaseUrl && CONFIG.supabaseKey) {
     try {
-      const res = await fetch(`${CONFIG.supabaseUrl}/rest/v1/gifts?select=id,name,description,category,points,stock,image&hidden=eq.false&order=id`,
+      const res = await fetch(`${CONFIG.supabaseUrl}/rest/v1/gifts?select=*&hidden=eq.false&order=id`,
         { headers: { apikey: CONFIG.supabaseKey }, cache: "no-store" });
       if (!res.ok) throw new Error(res.status);
       const list = await res.json();
@@ -61,7 +89,7 @@ function renderGrid() {
     (stock === "all" || (stock === "in") === (g.stock > 0)) &&
     (cat === "all" || g.category === cat));
   const by = {
-    "points-asc": (a, b) => a.points - b.points, "points-desc": (a, b) => b.points - a.points,
+    "points-asc": (a, b) => price(a) - price(b), "points-desc": (a, b) => price(b) - price(a),
     "name-asc": (a, b) => a.name.localeCompare(b.name), "name-desc": (a, b) => b.name.localeCompare(a.name)
   }[sort];
   list.sort(by);
@@ -75,6 +103,7 @@ function renderGrid() {
     img.onerror = () => { img.onerror = null; img.src = "assets/duck.svg"; img.classList.add("ph"); };
     img.src = g.image || "missing";
     thumb.appendChild(img);
+    if (g.discount > 0) { const sb = document.createElement("span"); sb.className = "sale-badge"; sb.textContent = `-${g.discount}%`; thumb.appendChild(sb); }
     thumb.tabIndex = 0; thumb.setAttribute("role", "button"); thumb.setAttribute("aria-label", `See ${g.name} bigger`);
     thumb.onclick = () => openPhoto(g);
     thumb.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPhoto(g); } };
@@ -83,7 +112,7 @@ function renderGrid() {
     const p = document.createElement("p"); p.textContent = g.description;
     const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = g.category;
     const av = document.createElement("span"); av.className = "tag" + (g.stock > 0 ? "" : " out"); av.textContent = g.stock > 0 ? (g.stock <= 3 ? `Only ${g.stock} left` : `${g.stock} left`) : "Out of stock";
-    const pr = document.createElement("div"); pr.className = "price"; pr.textContent = `${g.points} Ducks`;
+    const pr = document.createElement("div"); pr.className = "price"; fillPrice(pr, g);
     const btn = document.createElement("button"); btn.className = "primary"; btn.textContent = g.stock > 0 ? "Add to Cart" : "Out of stock";
     btn.disabled = !(g.stock > 0);
     btn.onclick = () => addOne(g);
@@ -105,7 +134,7 @@ function openPhoto(g) {
   big.src = g.image || "assets/duck.svg"; big.alt = g.name;
   $("photoName").textContent = g.name;
   $("photoDesc").textContent = g.description || "";
-  $("photoPrice").textContent = `${g.points} Ducks`;
+  fillPrice($("photoPrice"), g);
   const st = $("photoStock");
   st.className = "tag" + (g.stock > 0 ? "" : " out");
   st.textContent = g.stock > 0 ? (g.stock <= 3 ? `Only ${g.stock} left` : `${g.stock} left`) : "Out of stock";
@@ -124,10 +153,14 @@ function renderCart() {
   let n = 0, pts = 0;
   if (!lines.length) box.innerHTML = '<p class="empty">Your cart is empty. Tap “Add to Cart” on a gift.</p>';
   lines.forEach(({ g, qty }) => {
-    n += qty; pts += qty * g.points;
+    const p = price(g);
+    n += qty; pts += qty * p;
     const row = document.createElement("div"); row.className = "item";
     const t = document.createElement("div"); t.innerHTML = "<b></b><br><small></small>";
-    t.querySelector("b").textContent = g.name; t.querySelector("small").textContent = `${g.points} Ducks each = ${g.points * qty} Ducks`;
+    t.querySelector("b").textContent = g.name;
+    const small = t.querySelector("small");
+    if (g.discount > 0) { const s = document.createElement("s"); s.textContent = g.points; small.append(s, ` ${p} Ducks each (-${g.discount}%) = ${p * qty} Ducks`); }
+    else small.textContent = `${p} Ducks each = ${p * qty} Ducks`;
     const q = document.createElement("div"); q.className = "qty";
     const minus = document.createElement("button"); minus.textContent = "−"; minus.setAttribute("aria-label", "Decrease");
     const num = document.createElement("span"); num.textContent = qty;
@@ -164,9 +197,9 @@ function makeRef() {
 }
 function buildMessage(name, ref) {
   const lines = cartLines();
-  const n = lines.reduce((s, l) => s + l.qty, 0), pts = lines.reduce((s, l) => s + l.qty * l.g.points, 0);
+  const n = lines.reduce((s, l) => s + l.qty, 0), pts = lines.reduce((s, l) => s + l.qty * price(l.g), 0);
   return [`🦆 ${CONFIG.hashtag}`, `Order ref: ${ref}`, `Name: ${name}`, "", "Gifts:",
-    ...lines.map(l => `• ${l.g.name} x${l.qty} = ${l.qty * l.g.points} Ducks`), "",
+    ...lines.map(l => `• ${l.g.name} x${l.qty} = ${l.qty * price(l.g)} Ducks` + (l.g.discount > 0 ? ` (${l.g.discount}% off, was ${l.qty * l.g.points})` : "")), "",
     `Total gifts: ${n}`, `Total Ducks: ${pts}`].join("\n");
 }
 
@@ -197,4 +230,5 @@ $("nameForm").addEventListener("submit", e => {
   toast("WhatsApp opened. Press Send there to finish your request 🦆");
 });
 try { localStorage.removeItem("duckshop-pending"); } catch {}
+loadBanner();
 init();

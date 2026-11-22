@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="icon" href="assets/duck.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css?v=20261122g">
-<link rel="stylesheet" href="css/admin.css?v=20261122g">
+<link rel="stylesheet" href="css/style.css?v=20261122h">
+<link rel="stylesheet" href="css/admin.css?v=20261122h">
 </head>
 <body class="admin">
 <header class="admin-top">
@@ -46,6 +46,26 @@
     <div class="tabs" role="tablist" aria-label="Admin sections">
       <button type="button" role="tab" id="tabGifts" class="tab on" aria-selected="true">🎁 Gifts</button>
       <button type="button" role="tab" id="tabRequests" class="tab" aria-selected="false">📋 Requests <span id="newCount" class="badge" hidden>0</span></button>
+      <button type="button" role="tab" id="tabMessage" class="tab" aria-selected="false">📣 Shop message</button>
+    </div>
+
+    <div id="messageView" hidden>
+      <form id="msgForm" class="panel msg-form">
+        <h2>Message at the bottom of the shop</h2>
+        <p class="muted small">This is the box with the Santa ducks under the gifts. Change the words, or hide it. Press <b>Save</b> and the shop changes right away.</p>
+        <label class="check"><input id="msgShow" type="checkbox"> <span>Show this message in the shop</span></label>
+        <label>Big text <input id="msgTitle" maxlength="120" placeholder="e.g. Wait for our Christmas Collection Soon"></label>
+        <label>Small line under it (optional, emojis are fine) <input id="msgText" maxlength="200" placeholder="e.g. ❄ 🎄 ❄"></label>
+        <p class="muted small">How it will look:</p>
+        <div id="msgPreview" class="xmas msg-preview">
+          <div class="xmas-ducks" aria-hidden="true"><img src="assets/duck-santa.svg" alt=""><img src="assets/duck-santa.svg" alt=""><img src="assets/duck-santa.svg" alt=""></div>
+          <p class="xmas-title" id="msgPrevTitle"></p>
+          <p class="xmas-flakes" id="msgPrevText"></p>
+        </div>
+        <p id="msgHiddenNote" class="muted small" hidden>🙈 Hidden: the girls will not see this message.</p>
+        <p id="msgError" class="error"></p>
+        <div class="row"><button type="submit" id="msgSave" class="primary">Save</button></div>
+      </form>
     </div>
 
     <div id="requestsView" hidden>
@@ -74,8 +94,17 @@
       <button id="reeditBtn" class="ghost big">✨ Re-edit photos</button>
       <input id="adminSearch" type="search" placeholder="Search your gifts" aria-label="Search your gifts">
       <p id="adminCount" class="muted"></p>
+      <p class="muted small">🏷️ <b>Discount:</b> tick the box next to the gifts you want, then choose the discount in the bar at the bottom.</p>
     </div>
     <div id="giftList" class="gift-list"></div>
+    <div id="selBar" class="sel-bar" hidden>
+      <b id="selCount">0 selected</b>
+      <button type="button" id="selAll" class="ghost">Select all shown</button>
+      <label class="sel-pct">Discount <input id="selPct" type="number" min="1" max="90" step="1" inputmode="numeric" value="10"> %</label>
+      <button type="button" id="selApply" class="primary">Apply discount</button>
+      <button type="button" id="selRemove" class="ghost">Remove discount</button>
+      <button type="button" id="selClear" class="ghost" aria-label="Unselect all">✕</button>
+    </div>
     </div>
   </section>
 
@@ -130,6 +159,8 @@
       <label>Price (Ducks) <input id="fPoints" type="number" min="0" max="100000" step="1" required inputmode="numeric"></label>
       <label>How many? <input id="fStock" type="number" min="0" max="100000" step="1" required inputmode="numeric"></label>
     </div>
+    <label class="disc-row">Discount % (0 = no discount)
+      <span class="disc-in"><input id="fDiscount" type="number" min="0" max="90" step="1" inputmode="numeric" value="0"> <span id="fDiscNote" class="muted small"></span></span></label>
     <datalist id="catList"></datalist>
     <label class="check"><input id="fHidden" type="checkbox"> Hide this gift from the shop for now</label>
 
@@ -190,7 +221,7 @@
 </dialog>
 
 <div id="toast" class="toast" role="status"></div>
-<script src="js/config.js?v=20261122g"></script>
-<script type="module" src="js/admin.js?v=20261122g"></script>
+<script src="js/config.js?v=20261122h"></script>
+<script type="module" src="js/admin.js?v=20261122h"></script>
 </body>
 </html>

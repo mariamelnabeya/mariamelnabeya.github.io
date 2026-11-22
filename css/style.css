@@ -133,3 +133,11 @@ body.has-fab .xmas{padding-bottom:100px}
 /* ---- Pop-up message: fully hidden when not showing (also when it sits above the cart button) ---- */
 .toast{opacity:0;visibility:hidden;pointer-events:none;cursor:pointer;max-width:calc(100vw - 120px);text-align:center;transition:transform .2s,opacity .2s,visibility .2s}
 .toast.show{opacity:1;visibility:visible;pointer-events:auto}
+
+/* ---- Discounts: old price crossed out, new price, and a "-20%" sticker on the photo ---- */
+.price s{color:var(--soft);font-size:.8em;font-weight:500;margin-right:6px;text-decoration-thickness:2px}
+.price .now{color:#C2185B}
+.sale-badge{position:absolute;top:10px;left:10px;background:#E91E63;color:#fff;font:600 1rem Fredoka;padding:4px 12px;border-radius:999px;box-shadow:0 2px 6px rgba(59,47,74,.25);transform:rotate(-6deg)}
+.item small s{color:var(--soft)}
+/* when the bottom message is hidden, keep space for the cart button under the last text */
+body.has-fab.no-banner .foot{padding-bottom:100px}

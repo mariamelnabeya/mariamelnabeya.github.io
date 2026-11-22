@@ -132,3 +132,23 @@ textarea{font:inherit;padding:11px 14px;border:2px solid var(--line);border-radi
 .busy-ring b{width:66px;height:66px;border-radius:50%;background:#fff;display:grid;place-items:center;font:600 1.25rem Fredoka;color:var(--ink)}
 .busy span{font-weight:700;font-size:.9rem;color:var(--ink);max-width:22ch}
 @media(prefers-reduced-motion:no-preference){.busy-ring{transition:background .3s}}
+
+/* ---- Discounts: tick gifts, then use the bar at the bottom ---- */
+.g-pick{position:relative;display:block;line-height:0;cursor:pointer}
+.g-pick input{position:absolute;top:-6px;left:-6px;width:26px;height:26px;margin:0;accent-color:var(--accent);cursor:pointer;background:#fff;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.g-row.is-picked{border-color:var(--accent);background:#F6F2FF}
+.tag.sale{background:#FFE0E6;color:#B0234A}
+.g-info s{color:var(--soft)}
+.sel-bar{position:sticky;bottom:12px;z-index:5;margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--ink);color:#fff;border-radius:18px;padding:10px 12px;box-shadow:0 6px 20px rgba(40,30,60,.3)}
+.sel-bar .ghost{background:#fff;border-color:#fff}
+.sel-bar #selClear{margin-left:auto;padding:7px 12px}
+.sel-pct{display:flex;align-items:center;gap:6px;font-weight:700;color:#fff}
+.sel-pct input{width:72px;padding:7px 10px}
+.disc-in{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.disc-in input{width:100px}
+
+/* ---- Shop message tab ---- */
+.msg-form{display:grid;gap:12px;max-width:640px}
+.msg-preview{border-radius:24px}
+.msg-preview::before{border-radius:24px 24px 0 0}
+.msg-preview.off{opacity:.35;filter:grayscale(.6)}
