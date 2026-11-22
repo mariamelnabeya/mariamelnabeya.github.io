@@ -7,6 +7,7 @@ self.onmessage = async (e) => {
   try {
     const result = await removeBackground(blob, {
       model,
+      device: "cpu",   // the graphics-chip version needs a second big download and wasn't clearly faster
       output: { format: "image/png" },
       progress: (key, cur, total) => self.postMessage({ id, progress: { key, cur, total } })
     });

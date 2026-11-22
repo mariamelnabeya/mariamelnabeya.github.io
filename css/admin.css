@@ -123,3 +123,12 @@ textarea{font:inherit;padding:11px 14px;border:2px solid var(--line);border-radi
 .crop-box .h[data-c="ne"]{right:-4px;top:-4px}
 .crop-box .h[data-c="sw"]{left:-4px;bottom:-4px}
 .crop-box .h[data-c="se"]{right:-4px;bottom:-4px}
+
+/* ---- Progress circle while the edited photo is made ---- */
+.photo-wrap{position:relative}
+.busy{position:absolute;inset:0;border-radius:16px;background:rgba(255,248,230,.82);display:grid;place-content:center;justify-items:center;gap:8px;text-align:center;padding:10px}
+.busy-ring{--p:0;width:86px;height:86px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--duck-dark) calc(var(--p) * 1%), #F3E6C4 0)}
+.busy-ring b{width:66px;height:66px;border-radius:50%;background:#fff;display:grid;place-items:center;font:600 1.25rem Fredoka;color:var(--ink)}
+.busy span{font-weight:700;font-size:.9rem;color:var(--ink);max-width:22ch}
+@media(prefers-reduced-motion:no-preference){.busy-ring{transition:background .3s}}

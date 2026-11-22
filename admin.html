@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="icon" href="assets/duck.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css?v=20261122d">
-<link rel="stylesheet" href="css/admin.css?v=20261122d">
+<link rel="stylesheet" href="css/style.css?v=20261122f">
+<link rel="stylesheet" href="css/admin.css?v=20261122f">
 </head>
 <body class="admin">
 <header class="admin-top">
@@ -91,7 +91,13 @@
     </div>
 
     <div class="photo-area">
-      <div class="photo-preview" id="photoPreview"><span class="muted">No photo yet</span></div>
+      <div class="photo-wrap">
+        <div class="photo-preview" id="photoPreview"><span class="muted">No photo yet</span></div>
+        <div class="busy" id="photoBusy" hidden aria-live="polite">
+          <div class="busy-ring" id="busyRing"><b id="busyPct">0%</b></div>
+          <span id="busyText">Making the edited photo…</span>
+        </div>
+      </div>
       <div class="photo-controls">
         <div class="photo-btns">
           <label class="primary file-btn">📷 Take a photo
@@ -184,7 +190,7 @@
 </dialog>
 
 <div id="toast" class="toast" role="status"></div>
-<script src="js/config.js?v=20261122d"></script>
-<script type="module" src="js/admin.js?v=20261122d"></script>
+<script src="js/config.js?v=20261122f"></script>
+<script type="module" src="js/admin.js?v=20261122f"></script>
 </body>
 </html>

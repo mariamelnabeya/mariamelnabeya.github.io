@@ -245,7 +245,10 @@ async function removeBg(blob, onProgress) {
     progress: (key, current, total) => onProgress({ key, cur: current, total }) });
 }
 
-async function studioPhoto(file, onStatus) {
+const WORK_TIME_KEY = "duckshop-bg-seconds";   // how long removing the background took last time on this device
+async function studioPhoto(file, onStatus, onPct) {
+  let shown = 0;
+  const pct = (p, text) => { p = Math.max(shown, Math.min(100, p)); shown = p; if (onPct) onPct(Math.round(p), text); };
   // 1) shrink very big phone photos (max 2000px) so it runs faster but stays sharp
   const bmp = await bitmapOf(file);
   const s = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
@@ -262,11 +265,39 @@ async function studioPhoto(file, onStatus) {
   const small = await new Promise(r => guide.toBlob(r, "image/jpeg", 0.92));   // JPEG: much faster than PNG, same shape result
 
   // 2) remove the background (the first time on a device, the tool is downloaded once)
-  onStatus("Getting the photo tool ready… (the first time can take a minute)");
-  const shapeBlob = await removeBg(small, ({ key, cur, total }) => {
-    if (String(key).startsWith("fetch") && total && cur < total) onStatus(`Getting the photo tool ready… ${Math.round(cur / total * 100)}%`);
-    else onStatus("Removing the background… (you can keep typing the name and price)");
-  });
+  //    Progress shown to the owner:  5% ready → up to 45% downloading the tool (exact, first time only)
+  //    → up to 95% removing the background (estimated from how long it took last time) → 100% done.
+  pct(5, "Getting ready…");
+  onStatus("The first photo on a new phone takes longer: the photo tool downloads once.");
+  const files = new Map(); let downloaded = false, workStart = 0, timer = 0;
+  const expected = (() => { try { return Math.min(180, Math.max(8, +localStorage.getItem(WORK_TIME_KEY) || 25)); } catch { return 25; } })();
+  const startWork = () => {
+    if (workStart) return;
+    workStart = performance.now();
+    const from = Math.max(downloaded ? 45 : 8, shown);
+    onStatus("You can keep typing the name and price while the photo is made.");
+    timer = setInterval(() => {   // smooth estimate: grows quickly at first, never passes 95% until really done
+      const t = (performance.now() - workStart) / 1000;
+      pct(from + (95 - from) * (1 - Math.exp(-1.6 * t / expected)), "Removing the background…");
+    }, 250);
+  };
+  let shapeBlob, waitTimer = setTimeout(startWork, 2000);   // no download news for 2 s = the tool is working
+  try {
+    shapeBlob = await removeBg(small, ({ key, cur, total }) => {
+      if (String(key).startsWith("fetch")) {
+        if (workStart || !total) return;
+        files.set(key, [cur, total]); downloaded = true;
+        let c = 0, t = 0; for (const [a, b] of files.values()) { c += a; t += b; }
+        pct(5 + 40 * c / t, "Downloading the photo tool (first time only)…");
+        onStatus("");
+        clearTimeout(waitTimer); waitTimer = setTimeout(startWork, 2000);
+        return;
+      }
+      clearTimeout(waitTimer); startWork();
+    });
+  } finally { clearInterval(timer); clearTimeout(waitTimer); }
+  if (workStart) { try { localStorage.setItem(WORK_TIME_KEY, String(Math.round((performance.now() - workStart) / 1000))); } catch {} }
+  pct(97, "Almost done…");
   const shape = await bitmapOf(shapeBlob);
 
   // 3) cut the untouched photo with that shape, and find where the product is
@@ -448,6 +479,16 @@ $("cropApply").onclick = () => {
   box.addEventListener("pointerup", end); box.addEventListener("pointercancel", end);
 })();
 
+// The progress circle over the photo: setBusy(42, "text") shows 42%, setBusy(null) hides it.
+function setBusy(p, text) {
+  const b = $("photoBusy");
+  if (p == null) { b.hidden = true; return; }
+  b.hidden = false;
+  $("busyRing").style.setProperty("--p", p);
+  $("busyPct").textContent = p + "%";
+  if (text) $("busyText").textContent = text;
+}
+
 // Makes the photo that will be SAVED: the edited one ("Edited") or the original one ("Original"),
 // following the "Make the photo pretty" switch. Both versions are remembered,
 // so switching back and forth is instant after the first time.
@@ -475,13 +516,16 @@ async function preparePhoto() {
       // Reuse a version that is already being made (for example after switching Edited → Original → Edited).
       const mine = cache;
       const key = kind + "Job";
-      mine[key] = mine[key] || (enhance ? studioPhoto(mine.source, status) : plainPhoto(mine.source))
+      if (enhance) setBusy(...(mine.studioPct || [0, "Making the edited photo…"])); else setBusy(null);
+      const onPct = (p, t) => { mine.studioPct = [p, t]; if (cache === mine && $("enhanceToggle").checked) setBusy(p, t); };
+      mine[key] = mine[key] || (enhance ? studioPhoto(mine.source, status, onPct) : plainPhoto(mine.source))
         .then(r => { mine[kind] = r; return r; })
         .catch(e => { mine[key] = null; throw e; });
       const result = await mine[key];
       if (job !== photoJob) return;
       photo.result = result;
-    }
+      if (enhance) { setBusy(100, "Done!"); setTimeout(() => { if (job === photoJob) setBusy(null); }, 500); }
+    } else setBusy(null);
     previewBlob(photo.result);
     if (enhance) status("✨ Edited photo will be saved. Tap “Original” to save the photo as it is.");
     else if (sourceKind === "saved") status("This gift's original photo wasn't kept (it was added before this option existed). To use the real original, tap “Choose from gallery” and pick it.");
@@ -490,6 +534,7 @@ async function preparePhoto() {
     if (job !== photoJob) return;
     console.error(err);
     if (photo) photo.result = null;
+    setBusy(null);
     status("Sorry, automatic editing didn't work for this photo: " + friendly(err) + " Tap “Original” to use the photo as it is.");
   } finally {
     if (job === photoJob) $("saveBtn").disabled = false;
@@ -520,7 +565,7 @@ async function originalForStorage(blob) {
 
 // ---------- add / edit ----------
 function openEditor(g = null) {
-  editing = g; photo = null; chosenFile = null; rotation = 0; crop = null; photoJob++;
+  editing = g; photo = null; chosenFile = null; rotation = 0; crop = null; photoJob++; setBusy(null);
   sourceKind = "new"; srcGen++; cache = { gen: -1, source: null, studio: null, plain: null };
   $("rotateRow").hidden = !(g && g.image);
   $("editForm").reset();
@@ -644,7 +689,7 @@ async function revItem(sourceFile = null) {
       src = await res.blob();
     }
     status("Working on the photo…");
-    const out = await studioPhoto(src, status);
+    const out = await studioPhoto(src, status, (p, t) => status(`${t} ${p}%`));
     if (job !== rev.job) return;
     rev.result = out;
     const img = new Image(); img.alt = "New photo"; img.src = URL.createObjectURL(out);
