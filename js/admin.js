@@ -19,10 +19,13 @@ let photo = null;        // { original: Blob, result: Blob } for the chosen phot
 let photoJob = 0;        // ignores old photo work when a new photo is chosen
 
 // ---------- small helpers ----------
-function toast(msg, ms = 2200) {
+// Short message at the bottom: every message shows for 5 seconds (tap it to close sooner).
+const TOAST_MS = 5000;
+function toast(msg) {
   const t = $("toast"); t.textContent = msg; t.classList.add("show");
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), ms);
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), TOAST_MS);
 }
+$("toast").addEventListener("click", () => { clearTimeout(toast.t); $("toast").classList.remove("show"); });
 function show(view) {
   ["loginView", "notAdminView", "mainView", "loading"].forEach(v => $(v).hidden = v !== view);
   $("adminNav").hidden = view !== "mainView";
@@ -68,7 +71,7 @@ $("notAdminOut").onclick = signOut;
 // ---------- gift list ----------
 async function loadGifts() {
   const { data, error } = await sb.from("gifts").select("*").order("id");
-  if (error) { toast(friendly(error), 4000); return; }
+  if (error) { toast(friendly(error)); return; }
   gifts = data;
   $("importBox").hidden = gifts.length > 0;
   $("catList").innerHTML = "";
@@ -130,14 +133,14 @@ async function setStock(g, n) {
   n = Math.max(0, n);
   const old = g.stock; g.stock = n; renderList();
   const { error } = await sb.from("gifts").update({ stock: n }).eq("id", g.id);
-  if (error) { g.stock = old; renderList(); toast(friendly(error), 4000); return; }
+  if (error) { g.stock = old; renderList(); toast(friendly(error)); return; }
   toast(n < 1 ? `${g.name} is now out of stock` : `${g.name}: ${n} left`);
 }
 
 async function removeGift(g) {
   if (!confirm(`Delete "${g.name}" from the shop? This cannot be undone.`)) return;
   const { error } = await sb.from("gifts").delete().eq("id", g.id);
-  if (error) { toast(friendly(error), 4000); return; }
+  if (error) { toast(friendly(error)); return; }
   await deletePhoto(g.image);
   await deletePhoto(g.original_image);
   toast(`${g.name} deleted`);
@@ -518,7 +521,7 @@ $("importBtn").onclick = async () => {
     toast(`${rows.length} gifts imported 🎉`);
     loadGifts();
   } catch (ex) {
-    toast(friendly(ex), 5000);
+    toast(friendly(ex));
   } finally {
     b.disabled = false; b.textContent = "Import my starter gifts";
   }
@@ -621,7 +624,7 @@ $("reqRefresh").onclick = () => loadRequests();
 
 async function loadRequests() {
   const { data, error } = await sb.from("requests").select("*").order("created_at", { ascending: false }).limit(300);
-  if (error) { toast(friendly(error), 4000); return; }
+  if (error) { toast(friendly(error)); return; }
   requests = data;
   renderRequests();
 }
@@ -680,7 +683,7 @@ async function reqAction(r, what) {
     ({ error } = await sb.from("requests").delete().eq("id", r.id));
   }
   else ({ error } = await sb.from("requests").update({ status: "cancelled" }).eq("id", r.id));
-  if (error) { toast(friendly(error), 4000); return; }
+  if (error) { toast(friendly(error)); return; }
   toast({ done: `Done! Stock lowered for ${r.name}'s gifts.`, reopen: "Moved back to New.", delete: "Request deleted." }[what] || "Request cancelled (stock not changed).");
   await Promise.all([loadRequests(), loadGifts()]);
 }
